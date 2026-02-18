@@ -1,4 +1,4 @@
-# VotingMe
+# MyVote
 Another simple voting system for any communities with free and full service.
 Created with Snapshot frontend, integrat the AirAccount plugin to get login with any Web2 account and your finger print: Email, Google Account, Wechat, Twitter and more. 
 这份关于 Snapshot 及其周边治理体系的深度调研报告旨在为您澄清概念、分析架构，并为您的开发方向（做皮肤 vs Fork vs 新造）提供决策依据。
