@@ -1,4 +1,37 @@
 # Plan
+
+## V1 Open-source Snapshot Interface Plan (Custom Login + zh-CN Default + Multi-language)
+
+### Goal
+- Build an open-source governance portal UI based on Snapshot X, aligned with the official standard implementation.
+- Keep data interoperable with snapshot.box (spaces/proposals/votes created via the same protocol can be indexed and shown by the official explorer).
+- Provide a pluggable login module: standard Web3 wallets + a customizable Web2-style login (e.g. AirAccount).
+- Default language zh-CN, with English and more languages selectable.
+
+### V1 Scope (Must-have)
+- Explore: list/search spaces; view space detail; view proposal detail; show voting power and results.
+- Actions: propose + vote via `sx.js` standard flow; support relayer-based gasless flow (Mana).
+- Auth: an abstract Auth Provider interface; ship at least 2 implementations (Wallet, AirAccount adapter placeholder).
+- I18n: zh-CN default; English; runtime language switch; locale-aware number/date formatting.
+
+### Technical Approach (Follow Official)
+- Protocol/SDK/UI layering: Snapshot X contracts → `sx.js` → Vue3 UI (official-style).
+- Data layer options:
+  - Default: use official GraphQL (`sx-api`) endpoint for identical data and fastest development.
+  - Optional: allow switching to self-hosted `sx-api` for sovereignty.
+- Relayer options:
+  - Default: use official Mana endpoint for gasless voting.
+  - Optional: self-host Mana to customize sponsorship logic.
+
+### Milestones (Do One by One)
+1. Project skeleton: Vue3 + TypeScript; routing; basic layout.
+2. I18n baseline: zh-CN default; English; language switch UI.
+3. Auth baseline: pluggable auth interface; Wallet provider; AirAccount provider stub.
+4. Data baseline: GraphQL client + Explore page listing spaces.
+5. Space/Proposal pages: minimal detail views and loading/error states.
+6. Voting: connect auth → sign → submit (via `sx.js` + relayer); show status/receipt.
+7. Hardening: config via env vars; lint/typecheck/build green.
+
 https://github.com/snapshot-labs/sx-starknet
 https://github.com/snapshot-labs/sx-monorepo
 https://snapshot.box/#/explore
