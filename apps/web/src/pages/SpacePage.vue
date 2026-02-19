@@ -4,30 +4,15 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
 import { GRAPHQL_ENDPOINT } from '../config'
-import { graphqlRequest } from '../lib/graphql'
+import { fetchSpaceWithProposals, type ProposalListItem, type Space } from '../lib/graphql'
 
 const { t, locale } = useI18n()
 const route = useRoute()
 
 const spaceId = computed(() => String(route.params.id ?? ''))
 
-type Space = {
-  id: string
-  name: string
-  about?: string
-  network?: string
-  symbol?: string
-}
-
-type Proposal = {
-  id: string
-  title: string
-  created: number
-  state: string
-}
-
 const space = ref<Space | null>(null)
-const proposals = ref<Proposal[]>([])
+const proposals = ref<ProposalListItem[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 
@@ -51,36 +36,11 @@ async function loadSpace() {
   loading.value = true
   error.value = null
   try {
-    const data = await graphqlRequest<{
-      space: Space | null
-      proposals: Proposal[]
-    }>(
-      GRAPHQL_ENDPOINT,
-      `
-        query SpacePage($spaceId: String!, $first: Int!, $skip: Int!) {
-          space(id: $spaceId) {
-            id
-            name
-            about
-            network
-            symbol
-          }
-          proposals(
-            first: $first
-            skip: $skip
-            where: { space_in: [$spaceId] }
-            orderBy: "created"
-            orderDirection: desc
-          ) {
-            id
-            title
-            created
-            state
-          }
-        }
-      `,
-      { spaceId: spaceId.value, first: 20, skip: 0 }
-    )
+    const data = await fetchSpaceWithProposals(GRAPHQL_ENDPOINT, {
+      spaceId: spaceId.value,
+      first: 20,
+      skip: 0
+    })
 
     space.value = data.space
     proposals.value = data.proposals

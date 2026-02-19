@@ -6,28 +6,13 @@ import { providers } from 'ethers'
 
 import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME, SNAPSHOT_HUB_URL } from '../config'
 import { useAuth } from '../auth/useAuth'
-import { graphqlRequest } from '../lib/graphql'
+import { fetchProposal, type Proposal } from '../lib/graphql'
 
 const { t, locale } = useI18n()
 const route = useRoute()
 const auth = useAuth()
 
 const proposalId = computed(() => String(route.params.id ?? ''))
-
-type Proposal = {
-  id: string
-  title: string
-  body?: string
-  choices: string[]
-  type: 'single-choice' | 'approval' | 'quadratic' | 'ranked-choice' | 'weighted' | 'basic'
-  start: number
-  end: number
-  snapshot: string
-  state: string
-  author: string
-  created: number
-  space: { id: string; name: string }
-}
 
 const proposal = ref<Proposal | null>(null)
 const loading = ref(false)
@@ -67,31 +52,7 @@ async function loadProposal() {
   selectedChoice.value = null
   reason.value = ''
   try {
-    const data = await graphqlRequest<{ proposal: Proposal | null }>(
-      GRAPHQL_ENDPOINT,
-      `
-        query ProposalPage($proposalId: String!) {
-          proposal(id: $proposalId) {
-            id
-            title
-            body
-            choices
-            type
-            start
-            end
-            snapshot
-            state
-            author
-            created
-            space {
-              id
-              name
-            }
-          }
-        }
-      `,
-      { proposalId: proposalId.value }
-    )
+    const data = await fetchProposal(GRAPHQL_ENDPOINT, { proposalId: proposalId.value })
     proposal.value = data.proposal
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)

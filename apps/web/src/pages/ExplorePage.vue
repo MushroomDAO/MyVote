@@ -3,17 +3,9 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { GRAPHQL_ENDPOINT } from '../config'
-import { graphqlRequest } from '../lib/graphql'
+import { fetchSpaces, type Space } from '../lib/graphql'
 
 const { t } = useI18n()
-
-type Space = {
-  id: string
-  name: string
-  about?: string
-  network?: string
-  symbol?: string
-}
 
 const spaces = ref<Space[]>([])
 const loading = ref(false)
@@ -23,21 +15,7 @@ async function loadSpaces() {
   loading.value = true
   error.value = null
   try {
-    const data = await graphqlRequest<{ spaces: Space[] }>(
-      GRAPHQL_ENDPOINT,
-      `
-        query ExploreSpaces($first: Int!, $skip: Int!) {
-          spaces(first: $first, skip: $skip, orderBy: "created", orderDirection: desc) {
-            id
-            name
-            about
-            network
-            symbol
-          }
-        }
-      `,
-      { first: 30, skip: 0 }
-    )
+    const data = await fetchSpaces(GRAPHQL_ENDPOINT, { first: 30, skip: 0 })
     spaces.value = data.spaces
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
