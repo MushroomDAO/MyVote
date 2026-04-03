@@ -1,0 +1,28 @@
+{
+  "_comment": "Multi-tenant configuration. Each key is a hostname, value is the tenant config.",
+  "_comment2": "To add a tenant: add an entry here and redeploy. For dynamic tenants without redeploy, migrate to Cloudflare KV (see docs/M2-multi-tenant.md).",
+
+  "aastar.myvote.org": {
+    "spaceId": "aastar.eth",
+    "name": "AAStar Governance",
+    "description": "Decentralized governance for the AAStar community",
+    "logo": null,
+    "colors": {
+      "primary": "#646cff",
+      "primaryHover": "#535bf2",
+      "selectedBg": "rgba(100, 108, 255, 0.08)"
+    }
+  },
+
+  "demo.myvote.org": {
+    "spaceId": "ens.eth",
+    "name": "Demo Governance",
+    "description": "Demo tenant — shows ENS space",
+    "logo": null,
+    "colors": {
+      "primary": "#10b981",
+      "primaryHover": "#059669",
+      "selectedBg": "rgba(16, 185, 129, 0.08)"
+    }
+  }
+}
