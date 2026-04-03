@@ -47,7 +47,10 @@ const messages: Record<AppLocale, Record<string, string>> = {
     nameInvalid: '格式不正确',
     registerSuccess: '注册成功！',
     registerSuccessDesc: '你的社区治理页面已就绪：',
-    registerError: '注册失败'
+    registerError: '注册失败',
+    refresh: '刷新',
+    retry: '重试',
+    cached: '缓存'
   },
   en: {
     appTitle: 'MyVote',
@@ -91,7 +94,10 @@ const messages: Record<AppLocale, Record<string, string>> = {
     nameInvalid: 'Invalid format',
     registerSuccess: 'Registration successful!',
     registerSuccessDesc: 'Your community governance page is live at:',
-    registerError: 'Registration failed'
+    registerError: 'Registration failed',
+    refresh: 'Refresh',
+    retry: 'Retry',
+    cached: 'cached'
   }
 }
 

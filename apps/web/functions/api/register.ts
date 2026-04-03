@@ -90,16 +90,19 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   // --- Add custom domain to CF Pages project (triggers SSL cert issuance) ---
   // Wildcard DNS *.forest.mushroom.cv is already configured; we only need the Pages domain
   // registration to enable HTTPS for this specific subdomain.
-  const pagesResult = await cfApi(
-    token,
-    `/accounts/${accountId}/pages/projects/${pagesProject}/domains`,
-    'POST',
-    { name: domain }
-  )
-
-  if (!pagesResult.success) {
-    console.error('Pages domain warning:', pagesResult.errors)
-    // Non-fatal: KV is written, domain may still become active if DNS is configured correctly
+  if (token && accountId && pagesProject) {
+    const pagesResult = await cfApi(
+      token,
+      `/accounts/${accountId}/pages/projects/${pagesProject}/domains`,
+      'POST',
+      { name: domain }
+    )
+    if (!pagesResult.success) {
+      // Log but don't fail — KV is written; admin can manually add the domain if needed
+      console.error('Pages domain registration failed:', JSON.stringify(pagesResult.errors))
+    }
+  } else {
+    console.warn('CF_API_TOKEN / CF_ACCOUNT_ID / CF_PAGES_PROJECT not set — skipping Pages domain registration')
   }
 
   return Response.json({
