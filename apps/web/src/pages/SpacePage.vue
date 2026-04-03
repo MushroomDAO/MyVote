@@ -9,12 +9,16 @@ import { fetchSpaceWithProposals, type ProposalListItem, type Space } from '../l
 const { t, locale } = useI18n()
 const route = useRoute()
 
+const PAGE_SIZE = 20
+
 const spaceId = computed(() => String(route.params.id ?? ''))
 
 const space = ref<Space | null>(null)
 const proposals = ref<ProposalListItem[]>([])
 const loading = ref(false)
+const loadingMore = ref(false)
 const error = ref<string | null>(null)
+const hasMore = ref(true)
 
 const dtf = computed(
   () =>
@@ -31,34 +35,52 @@ function formatTs(seconds: number) {
   return dtf.value.format(new Date(seconds * 1000))
 }
 
-async function loadSpace() {
+async function loadSpace(skip: number) {
   if (!spaceId.value) return
-  loading.value = true
+  if (skip === 0) {
+    loading.value = true
+    space.value = null
+    proposals.value = []
+  } else {
+    loadingMore.value = true
+  }
   error.value = null
   try {
     const data = await fetchSpaceWithProposals(GRAPHQL_ENDPOINT, {
       spaceId: spaceId.value,
-      first: 20,
-      skip: 0
+      first: PAGE_SIZE,
+      skip
     })
 
-    space.value = data.space
-    proposals.value = data.proposals
+    if (skip === 0) {
+      space.value = data.space
+      proposals.value = data.proposals
+    } else {
+      proposals.value = [...proposals.value, ...data.proposals]
+    }
+    hasMore.value = data.proposals.length === PAGE_SIZE
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
-    space.value = null
-    proposals.value = []
+    if (skip === 0) {
+      space.value = null
+      proposals.value = []
+    }
   } finally {
     loading.value = false
+    loadingMore.value = false
   }
 }
 
+function loadMore() {
+  void loadSpace(proposals.value.length)
+}
+
 watch(spaceId, () => {
-  void loadSpace()
+  void loadSpace(0)
 })
 
 onMounted(() => {
-  void loadSpace()
+  void loadSpace(0)
 })
 </script>
 
@@ -102,6 +124,12 @@ onMounted(() => {
           </div>
         </li>
       </ul>
+
+      <div v-if="proposals.length > 0 && hasMore" class="more">
+        <button class="moreBtn" type="button" :disabled="loadingMore" @click="loadMore">
+          {{ loadingMore ? t('loading') : t('loadMore') }}
+        </button>
+      </div>
     </div>
   </main>
 </template>
@@ -124,7 +152,7 @@ onMounted(() => {
 }
 
 .card {
-  border: 1px solid rgba(60, 60, 60, 0.15);
+  border: 1px solid var(--mv-border);
   border-radius: 12px;
   padding: 16px;
 }
@@ -144,12 +172,12 @@ onMounted(() => {
 
 .id {
   font-size: 12px;
-  color: rgba(60, 60, 60, 0.6);
+  color: var(--mv-muted-sm);
 }
 
 .about {
   margin-top: 8px;
-  color: rgba(60, 60, 60, 0.75);
+  color: var(--mv-muted);
   font-size: 14px;
 }
 
@@ -160,12 +188,12 @@ onMounted(() => {
 
 .muted {
   margin-top: 10px;
-  color: rgba(60, 60, 60, 0.7);
+  color: var(--mv-muted);
   font-size: 14px;
 }
 
 .error {
-  color: #b00020;
+  color: var(--mv-error);
   word-break: break-word;
 }
 
@@ -178,7 +206,7 @@ onMounted(() => {
 }
 
 .item {
-  border: 1px solid rgba(60, 60, 60, 0.12);
+  border: 1px solid var(--mv-border-sm);
   border-radius: 10px;
   padding: 12px;
 }
@@ -192,9 +220,29 @@ onMounted(() => {
 .meta {
   margin-top: 6px;
   font-size: 12px;
-  color: rgba(60, 60, 60, 0.6);
+  color: var(--mv-muted-sm);
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.more {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.moreBtn {
+  border: 1px solid var(--mv-border-md);
+  border-radius: 10px;
+  padding: 8px 20px;
+  background: var(--mv-surface);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.moreBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 </style>

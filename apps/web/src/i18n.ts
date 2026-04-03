@@ -29,7 +29,10 @@ const messages: Record<AppLocale, Record<string, string>> = {
     loading: '加载中…',
     error: '出错了',
     spaces: '组织（Spaces）',
-    empty: '暂无数据'
+    empty: '暂无数据',
+    loadMore: '加载更多',
+    results: '投票结果',
+    votes: '票'
   },
   en: {
     appTitle: 'MyVote',
@@ -55,7 +58,10 @@ const messages: Record<AppLocale, Record<string, string>> = {
     loading: 'Loading…',
     error: 'Something went wrong',
     spaces: 'Spaces',
-    empty: 'No data'
+    empty: 'No data',
+    loadMore: 'Load more',
+    results: 'Results',
+    votes: 'votes'
   }
 }
 

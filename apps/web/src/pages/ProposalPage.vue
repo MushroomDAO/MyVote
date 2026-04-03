@@ -3,6 +3,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { providers } from 'ethers'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME, SNAPSHOT_HUB_URL } from '../config'
 import { useAuth } from '../auth/useAuth'
@@ -42,6 +44,22 @@ function formatTs(seconds: number) {
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`
 }
+
+const renderedBody = computed(() => {
+  const body = proposal.value?.body
+  if (!body) return ''
+  return DOMPurify.sanitize(marked(body) as string)
+})
+
+const voteResults = computed(() => {
+  const p = proposal.value
+  if (!p || !p.scores?.length) return []
+  return p.choices.map((choice, i) => {
+    const score = p.scores[i] ?? 0
+    const pct = p.scores_total > 0 ? (score / p.scores_total) * 100 : 0
+    return { choice, score, pct }
+  })
+})
 
 async function loadProposal() {
   if (!proposalId.value) return
@@ -164,7 +182,8 @@ onMounted(() => {
       </div>
 
       <div v-if="proposal.body" class="body">
-        <pre class="pre">{{ proposal.body }}</pre>
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div class="bodyContent" v-html="renderedBody" />
       </div>
 
       <div class="sectionTitle">{{ t('proposal') }}</div>
@@ -181,6 +200,25 @@ onMounted(() => {
           </button>
         </li>
       </ul>
+
+      <!-- Vote results -->
+      <div v-if="voteResults.length > 0" class="resultsSection">
+        <div class="sectionTitle">
+          {{ t('results') }}
+          <span class="votesCount">{{ proposal.votes }} {{ t('votes') }}</span>
+        </div>
+        <ul class="resultsList">
+          <li v-for="(r, idx) in voteResults" :key="idx" class="resultItem">
+            <div class="resultRow">
+              <span class="resultChoice">{{ r.choice }}</span>
+              <span class="resultPct">{{ r.pct.toFixed(1) }}%</span>
+            </div>
+            <div class="barTrack">
+              <div class="barFill" :style="{ width: `${r.pct}%` }" />
+            </div>
+          </li>
+        </ul>
+      </div>
 
       <div class="voteSection">
         <div class="sectionTitle">{{ t('vote') }}</div>
@@ -217,7 +255,7 @@ onMounted(() => {
 }
 
 .card {
-  border: 1px solid rgba(60, 60, 60, 0.15);
+  border: 1px solid var(--mv-border);
   border-radius: 12px;
   padding: 16px;
 }
@@ -241,11 +279,11 @@ onMounted(() => {
 }
 
 .chip {
-  border: 1px solid rgba(60, 60, 60, 0.2);
+  border: 1px solid var(--mv-border-md);
   border-radius: 999px;
   padding: 4px 10px;
   font-size: 12px;
-  color: rgba(60, 60, 60, 0.75);
+  color: var(--mv-muted);
 }
 
 .metaGrid {
@@ -256,14 +294,14 @@ onMounted(() => {
 }
 
 .metaItem {
-  border: 1px solid rgba(60, 60, 60, 0.12);
+  border: 1px solid var(--mv-border-sm);
   border-radius: 10px;
   padding: 10px;
 }
 
 .metaLabel {
   font-size: 12px;
-  color: rgba(60, 60, 60, 0.6);
+  color: var(--mv-muted-sm);
 }
 
 .metaValue {
@@ -280,23 +318,63 @@ onMounted(() => {
   margin-top: 14px;
 }
 
-.pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
+.bodyContent {
   padding: 12px;
-  border: 1px solid rgba(60, 60, 60, 0.12);
+  border: 1px solid var(--mv-border-sm);
   border-radius: 10px;
-  background: rgba(60, 60, 60, 0.03);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
-    monospace;
-  font-size: 13px;
-  line-height: 1.5;
+  background: var(--mv-surface);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Markdown content styling */
+.bodyContent :deep(h1),
+.bodyContent :deep(h2),
+.bodyContent :deep(h3) {
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+.bodyContent :deep(p) {
+  margin: 0.5em 0;
+}
+.bodyContent :deep(ul),
+.bodyContent :deep(ol) {
+  padding-left: 1.5em;
+}
+.bodyContent :deep(code) {
+  background: var(--mv-surface-md);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 0.9em;
+}
+.bodyContent :deep(pre) {
+  background: var(--mv-surface-md);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+}
+.bodyContent :deep(a) {
+  color: var(--mv-primary);
+}
+.bodyContent :deep(blockquote) {
+  border-left: 3px solid var(--mv-border-md);
+  margin: 0;
+  padding-left: 12px;
+  color: var(--mv-muted);
 }
 
 .sectionTitle {
   margin-top: 16px;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.votesCount {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--mv-muted-sm);
 }
 
 .choices {
@@ -308,7 +386,7 @@ onMounted(() => {
 }
 
 .choice {
-  border: 1px solid rgba(60, 60, 60, 0.12);
+  border: 1px solid var(--mv-border-sm);
   border-radius: 10px;
   padding: 0;
   overflow: hidden;
@@ -327,7 +405,7 @@ onMounted(() => {
 }
 
 .choiceButton[data-selected='true'] {
-  background: rgba(66, 184, 131, 0.08);
+  background: var(--mv-selected-bg);
 }
 
 .choiceButton:disabled {
@@ -338,11 +416,12 @@ onMounted(() => {
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  background: rgba(60, 60, 60, 0.06);
+  background: var(--mv-surface-md);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 .choiceText {
@@ -350,9 +429,58 @@ onMounted(() => {
   line-height: 1.4;
 }
 
+/* Vote results */
+.resultsSection {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--mv-border-sm);
+}
+
+.resultsList {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.resultItem {
+  font-size: 14px;
+}
+
+.resultRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.resultChoice {
+  font-weight: 600;
+}
+
+.resultPct {
+  color: var(--mv-muted-sm);
+}
+
+.barTrack {
+  height: 6px;
+  background: var(--mv-surface-md);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--mv-primary);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  min-width: 0;
+}
+
+/* Vote form */
 .voteSection {
   margin-top: 18px;
-  border-top: 1px solid rgba(60, 60, 60, 0.12);
+  border-top: 1px solid var(--mv-border-sm);
   padding-top: 16px;
 }
 
@@ -360,27 +488,28 @@ onMounted(() => {
   margin-top: 10px;
   display: block;
   font-size: 12px;
-  color: rgba(60, 60, 60, 0.6);
+  color: var(--mv-muted-sm);
 }
 
 .reason {
   margin-top: 6px;
   width: 100%;
   resize: vertical;
-  border: 1px solid rgba(60, 60, 60, 0.2);
+  border: 1px solid var(--mv-border-md);
   border-radius: 10px;
   padding: 10px;
   background: transparent;
   color: inherit;
   font: inherit;
+  box-sizing: border-box;
 }
 
 .submit {
   margin-top: 10px;
-  border: 1px solid rgba(60, 60, 60, 0.25);
+  border: 1px solid var(--mv-border-md);
   border-radius: 10px;
   padding: 10px 12px;
-  background: rgba(60, 60, 60, 0.04);
+  background: var(--mv-surface);
   color: inherit;
   cursor: pointer;
   font-weight: 700;
@@ -393,23 +522,23 @@ onMounted(() => {
 
 .voteError {
   margin-top: 10px;
-  color: #b00020;
+  color: var(--mv-error);
   word-break: break-word;
 }
 
 .voteOk {
   margin-top: 10px;
-  color: rgba(60, 60, 60, 0.8);
+  color: var(--mv-muted);
   font-weight: 600;
 }
 
 .muted {
-  color: rgba(60, 60, 60, 0.7);
+  color: var(--mv-muted);
   font-size: 14px;
 }
 
 .error {
-  color: #b00020;
+  color: var(--mv-error);
   word-break: break-word;
 }
 

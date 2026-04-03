@@ -7,26 +7,44 @@ import { fetchSpaces, type Space } from '../lib/graphql'
 
 const { t } = useI18n()
 
+const PAGE_SIZE = 30
+
 const spaces = ref<Space[]>([])
 const loading = ref(false)
+const loadingMore = ref(false)
 const error = ref<string | null>(null)
+const hasMore = ref(true)
 
-async function loadSpaces() {
-  loading.value = true
+async function loadSpaces(skip: number) {
+  if (skip === 0) {
+    loading.value = true
+  } else {
+    loadingMore.value = true
+  }
   error.value = null
   try {
-    const data = await fetchSpaces(GRAPHQL_ENDPOINT, { first: 30, skip: 0 })
-    spaces.value = data.spaces
+    const data = await fetchSpaces(GRAPHQL_ENDPOINT, { first: PAGE_SIZE, skip })
+    const newItems = data.spaces
+    if (skip === 0) {
+      spaces.value = newItems
+    } else {
+      spaces.value = [...spaces.value, ...newItems]
+    }
+    hasMore.value = newItems.length === PAGE_SIZE
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
-    spaces.value = []
   } finally {
     loading.value = false
+    loadingMore.value = false
   }
 }
 
+function loadMore() {
+  void loadSpaces(spaces.value.length)
+}
+
 onMounted(() => {
-  void loadSpaces()
+  void loadSpaces(0)
 })
 </script>
 
@@ -35,8 +53,6 @@ onMounted(() => {
     <h1 class="title">{{ t('explore') }}</h1>
     <section class="card">
       <div class="muted">{{ t('spaces') }}</div>
-
-      <div class="meta">{{ GRAPHQL_ENDPOINT }}</div>
 
       <div v-if="loading" class="placeholder">{{ t('loading') }}</div>
       <div v-else-if="error" class="error">{{ error }}</div>
@@ -50,6 +66,12 @@ onMounted(() => {
           <div v-if="space.about" class="about">{{ space.about }}</div>
         </li>
       </ul>
+
+      <div v-if="!loading && spaces.length > 0 && hasMore" class="more">
+        <button class="moreBtn" type="button" :disabled="loadingMore" @click="loadMore">
+          {{ loadingMore ? t('loading') : t('loadMore') }}
+        </button>
+      </div>
     </section>
   </main>
 </template>
@@ -68,31 +90,24 @@ onMounted(() => {
 }
 
 .card {
-  border: 1px solid rgba(60, 60, 60, 0.15);
+  border: 1px solid var(--mv-border);
   border-radius: 12px;
   padding: 16px;
 }
 
 .muted {
-  color: rgba(60, 60, 60, 0.7);
+  color: var(--mv-muted);
   font-size: 14px;
-}
-
-.meta {
-  margin-top: 6px;
-  font-size: 12px;
-  color: rgba(60, 60, 60, 0.6);
-  word-break: break-all;
 }
 
 .placeholder {
   margin-top: 10px;
-  color: rgba(60, 60, 60, 0.7);
+  color: var(--mv-muted);
 }
 
 .error {
   margin-top: 10px;
-  color: #b00020;
+  color: var(--mv-error);
   word-break: break-word;
 }
 
@@ -105,7 +120,7 @@ onMounted(() => {
 }
 
 .item {
-  border: 1px solid rgba(60, 60, 60, 0.12);
+  border: 1px solid var(--mv-border-sm);
   border-radius: 10px;
   padding: 12px;
 }
@@ -125,13 +140,33 @@ onMounted(() => {
 
 .id {
   font-size: 12px;
-  color: rgba(60, 60, 60, 0.6);
+  color: var(--mv-muted-sm);
   text-decoration: none;
 }
 
 .about {
   margin-top: 6px;
   font-size: 13px;
-  color: rgba(60, 60, 60, 0.75);
+  color: var(--mv-muted);
+}
+
+.more {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.moreBtn {
+  border: 1px solid var(--mv-border-md);
+  border-radius: 10px;
+  padding: 8px 20px;
+  background: var(--mv-surface);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.moreBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 </style>

@@ -64,6 +64,9 @@ export type Proposal = {
   state: string
   author: string
   created: number
+  votes: number
+  scores: number[]
+  scores_total: number
   space: { id: string; name: string }
 }
 
@@ -135,6 +138,9 @@ export async function fetchProposal(endpoint: string, params: { proposalId: stri
           state
           author
           created
+          votes
+          scores
+          scores_total
           space {
             id
             name
