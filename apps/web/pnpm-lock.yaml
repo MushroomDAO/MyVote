@@ -30,6 +30,9 @@ importers:
         specifier: ^4.6.4
         version: 4.6.4(vue@3.5.28(typescript@5.9.3))
     devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20260403.1
+        version: 4.20260403.1
       '@types/dompurify':
         specifier: ^3.2.0
         version: 3.2.0
@@ -70,6 +73,9 @@ packages:
   '@babel/types@7.29.0':
     resolution: {integrity: sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A==}
     engines: {node: '>=6.9.0'}
+
+  '@cloudflare/workers-types@4.20260403.1':
+    resolution: {integrity: sha512-p6oSNt3yUwcxSoXZ7qCog7+kgQbkSx1Beoci7TMb/xbRF05VR0cO/p1XUE2SLHZ7IgSIc3tNMpFKa0L0fa3Lzg==}
 
   '@ensdomains/eth-ens-namehash@2.0.15':
     resolution: {integrity: sha512-JRDFP6+Hczb1E0/HhIg0PONgBYasfGfDheujmfxaZaAv/NAH4jE6Kf48WbqfRZdxt4IZI3jl3Ri7sZ1nP09lgw==}
@@ -980,6 +986,8 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
+
+  '@cloudflare/workers-types@4.20260403.1': {}
 
   '@ensdomains/eth-ens-namehash@2.0.15': {}
 

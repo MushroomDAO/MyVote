@@ -32,7 +32,22 @@ const messages: Record<AppLocale, Record<string, string>> = {
     empty: '暂无数据',
     loadMore: '加载更多',
     results: '投票结果',
-    votes: '票'
+    votes: '票',
+    register: '注册社区',
+    registerDesc: '为你的社区注册一个专属治理域名',
+    communityName: '社区名称',
+    communityNameHint: '3-30位，仅限小写字母、数字和短横线',
+    snapshotSpaceId: 'Snapshot Space ID',
+    snapshotSpaceHint: '例如：ens.eth（在 snapshot.org 创建后获得）',
+    communityDesc: '社区描述（可选）',
+    registerBtn: '注册并部署',
+    checking: '检查中…',
+    nameAvailable: '可用',
+    nameTaken: '已被占用',
+    nameInvalid: '格式不正确',
+    registerSuccess: '注册成功！',
+    registerSuccessDesc: '你的社区治理页面已就绪：',
+    registerError: '注册失败'
   },
   en: {
     appTitle: 'MyVote',
@@ -61,7 +76,22 @@ const messages: Record<AppLocale, Record<string, string>> = {
     empty: 'No data',
     loadMore: 'Load more',
     results: 'Results',
-    votes: 'votes'
+    votes: 'votes',
+    register: 'Register',
+    registerDesc: 'Register a governance subdomain for your community',
+    communityName: 'Community name',
+    communityNameHint: '3–30 chars, lowercase letters, numbers and hyphens only',
+    snapshotSpaceId: 'Snapshot Space ID',
+    snapshotSpaceHint: 'e.g. ens.eth (create your space on snapshot.org first)',
+    communityDesc: 'Description (optional)',
+    registerBtn: 'Register & Deploy',
+    checking: 'Checking…',
+    nameAvailable: 'Available',
+    nameTaken: 'Already taken',
+    nameInvalid: 'Invalid format',
+    registerSuccess: 'Registration successful!',
+    registerSuccessDesc: 'Your community governance page is live at:',
+    registerError: 'Registration failed'
   }
 }
 

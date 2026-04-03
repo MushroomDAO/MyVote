@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale, type AppLocale } from './i18n'
 import { useAuth } from './auth/useAuth'
-import { resolvedBranding as branding } from './tenant'
+import { resolvedBranding as branding, tenant } from './tenant'
 
 const { t, locale } = useI18n()
 const auth = useAuth()
@@ -45,6 +45,8 @@ async function onConnectClick() {
 
       <nav class="nav">
         <RouterLink class="link" to="/explore">{{ t('explore') }}</RouterLink>
+        <!-- Register link: hidden in single-space (tenant) mode -->
+        <RouterLink v-if="!tenant.spaceId" class="link" to="/register">{{ t('register') }}</RouterLink>
       </nav>
 
       <div class="actions">

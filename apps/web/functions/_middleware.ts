@@ -2,11 +2,14 @@
  * Cloudflare Pages Middleware
  *
  * Runs at the edge for every request. Responsibilities:
- * 1. Tenant resolution: reads hostname → looks up tenants.json → injects window.__TENANT__ into HTML
- * 2. API proxy: /api/graphql → hub.snapshot.org/graphql (helps with China connectivity)
+ * 1. /api/graphql proxy → hub.snapshot.org (China connectivity optimization)
+ * 2. /api/* routes → pass through to specific function handlers
+ * 3. HTML requests → resolve tenant from KV, inject window.__TENANT__
  */
 
-import TENANTS_RAW from '../tenants.json'
+interface Env {
+  TENANTS_KV: KVNamespace
+}
 
 type TenantConfig = {
   spaceId?: string
@@ -16,12 +19,7 @@ type TenantConfig = {
   colors?: Record<string, string>
 }
 
-// tenants.json keys starting with '_comment' are documentation — strip them.
-const TENANTS = Object.fromEntries(
-  Object.entries(TENANTS_RAW as Record<string, unknown>).filter(([k]) => !k.startsWith('_comment'))
-) as Record<string, TenantConfig>
-
-export const onRequest: PagesFunction = async (context) => {
+export const onRequest: PagesFunction<Env> = async (context) => {
   const url = new URL(context.request.url)
 
   // --- API proxy: /api/graphql → Snapshot Hub ---
@@ -33,15 +31,28 @@ export const onRequest: PagesFunction = async (context) => {
     })
   }
 
-  // --- Tenant resolution + HTML injection ---
-  const hostname = url.hostname
-  const tenantConfig: TenantConfig | undefined = TENANTS[hostname]
+  // --- Other /api/* routes → pass to their specific function handlers ---
+  if (url.pathname.startsWith('/api/')) {
+    return context.next()
+  }
 
+  // --- Tenant resolution + HTML injection ---
   const response = await context.next()
 
-  // Only inject into HTML responses
   const contentType = response.headers.get('content-type') ?? ''
-  if (!tenantConfig || !contentType.includes('text/html')) {
+  if (!contentType.includes('text/html')) {
+    return response
+  }
+
+  // Look up tenant config from KV (gracefully handle missing KV binding in local dev)
+  let tenantConfig: TenantConfig | null = null
+  try {
+    tenantConfig = await context.env.TENANTS_KV.get<TenantConfig>(url.hostname, 'json')
+  } catch {
+    // KV not available (e.g., local dev without wrangler) — skip injection
+  }
+
+  if (!tenantConfig) {
     return response
   }
 

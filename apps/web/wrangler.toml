@@ -1,17 +1,28 @@
 name = "myvote"
 compatibility_date = "2024-01-01"
 
-# Local development:
+# Pages Functions build output
+pages_build_output_dir = "dist"
+
+# KV namespace binding for tenant configs
+# After creating: wrangler kv namespace create TENANTS_KV
+# Replace the id below with the real namespace ID
+[[kv_namespaces]]
+binding = "TENANTS_KV"
+id = "REPLACE_WITH_REAL_KV_ID"
+preview_id = "REPLACE_WITH_PREVIEW_KV_ID"
+
+# Environment variables (non-secret)
+# Secrets (CF_API_TOKEN etc.) must be set via:
+#   wrangler pages secret put CF_API_TOKEN --project-name myvote
+[vars]
+CF_ROOT_DOMAIN = "forest.mushroom.cv"
+
+# Local dev:
 #   pnpm run build
 #   wrangler pages dev dist/
 #
-# The middleware in functions/_middleware.ts runs automatically.
-# To test a specific tenant locally, add an entry to /etc/hosts:
-#   127.0.0.1  aastar.local
-# Then access http://aastar.local:8788
-#
-# Tenant config is read from tenants.json at build time.
-# For dynamic tenant management without redeployment, migrate to Cloudflare KV:
-#   [[kv_namespaces]]
-#   binding = "TENANTS_KV"
-#   id = "your-kv-namespace-id"
+# The middleware in functions/_middleware.ts and API routes in functions/api/ run automatically.
+# To test tenant routing locally, add to /etc/hosts:
+#   127.0.0.1  bread.forest.mushroom.cv
+# Then access http://bread.forest.mushroom.cv:8788
