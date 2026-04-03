@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale, type AppLocale } from './i18n'
 import { useAuth } from './auth/useAuth'
+import { branding } from './branding'
 
 const { t, locale } = useI18n()
 const auth = useAuth()
@@ -37,7 +38,10 @@ async function onConnectClick() {
 <template>
   <div class="app">
     <header class="header">
-      <div class="brand">{{ t('appTitle') }}</div>
+      <div class="brand">
+        <img v-if="branding.logo" :src="branding.logo" :alt="branding.name" class="logo" />
+        <span v-else>{{ t('appTitle') }}</span>
+      </div>
 
       <nav class="nav">
         <RouterLink class="link" to="/explore">{{ t('explore') }}</RouterLink>
@@ -82,11 +86,17 @@ async function onConnectClick() {
   align-items: center;
   gap: 16px;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(60, 60, 60, 0.15);
+  border-bottom: 1px solid var(--mv-border);
 }
 
 .brand {
   font-weight: 700;
+}
+
+.logo {
+  height: 28px;
+  width: auto;
+  display: block;
 }
 
 .nav {
@@ -113,11 +123,11 @@ async function onConnectClick() {
 
 .label {
   font-size: 12px;
-  color: rgba(60, 60, 60, 0.75);
+  color: var(--mv-muted);
 }
 
 .select {
-  border: 1px solid rgba(60, 60, 60, 0.25);
+  border: 1px solid var(--mv-border-md);
   border-radius: 8px;
   padding: 6px 8px;
   background: transparent;
@@ -125,10 +135,10 @@ async function onConnectClick() {
 }
 
 .button {
-  border: 1px solid rgba(60, 60, 60, 0.25);
+  border: 1px solid var(--mv-border-md);
   border-radius: 10px;
   padding: 6px 10px;
-  background: rgba(60, 60, 60, 0.04);
+  background: var(--mv-surface);
   color: inherit;
   cursor: pointer;
   font-weight: 600;
@@ -136,12 +146,12 @@ async function onConnectClick() {
 
 .address {
   font-size: 12px;
-  color: rgba(60, 60, 60, 0.75);
+  color: var(--mv-muted);
 }
 
 .error {
   padding: 10px 16px;
-  border-bottom: 1px solid rgba(60, 60, 60, 0.15);
-  color: #b00020;
+  border-bottom: 1px solid var(--mv-border);
+  color: var(--mv-error);
 }
 </style>

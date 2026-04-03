@@ -11,28 +11,36 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Brand colors — overridden at runtime from branding.ts via main.ts */
+  --mv-primary: #646cff;
+  --mv-primary-hover: #535bf2;
+  --mv-error: #b00020;
+  --mv-selected-bg: rgba(66, 184, 131, 0.08);
+
+  /* Structural neutral colors — rgba overlays work in both light and dark */
+  --mv-border: rgba(60, 60, 60, 0.15);
+  --mv-border-sm: rgba(60, 60, 60, 0.12);
+  --mv-border-md: rgba(60, 60, 60, 0.25);
+  --mv-muted: rgba(60, 60, 60, 0.7);
+  --mv-muted-sm: rgba(60, 60, 60, 0.6);
+  --mv-surface: rgba(60, 60, 60, 0.04);
+  --mv-surface-md: rgba(60, 60, 60, 0.06);
 }
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: var(--mv-primary);
   text-decoration: inherit;
 }
 a:hover {
-  color: #535bf2;
+  color: var(--mv-primary-hover);
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
 }
 
 button {
@@ -47,22 +55,17 @@ button {
   transition: border-color 0.25s;
 }
 button:hover {
-  border-color: #646cff;
+  border-color: var(--mv-primary);
 }
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-.card {
-  padding: 2em;
-}
-
 #app {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  padding: 0;
 }
 
 @media (prefers-color-scheme: light) {
@@ -71,7 +74,7 @@ button:focus-visible {
     background-color: #ffffff;
   }
   a:hover {
-    color: #747bff;
+    color: var(--mv-primary-hover);
   }
   button {
     background-color: #f9f9f9;
