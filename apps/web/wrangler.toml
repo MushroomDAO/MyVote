@@ -9,8 +9,8 @@ pages_build_output_dir = "dist"
 # Replace the id below with the real namespace ID
 [[kv_namespaces]]
 binding = "TENANTS_KV"
-id = "REPLACE_WITH_REAL_KV_ID"
-preview_id = "REPLACE_WITH_PREVIEW_KV_ID"
+id = "b48caba076cb477698121c95f9e69d9e"
+preview_id = "34c1c5f2e50243d1992af2f547151140"
 
 # Environment variables (non-secret)
 # Secrets (CF_API_TOKEN etc.) must be set via:

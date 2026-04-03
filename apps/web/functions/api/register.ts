@@ -76,10 +76,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   const token = context.env.CF_API_TOKEN
   const accountId = context.env.CF_ACCOUNT_ID
-  const zoneId = context.env.CF_ZONE_ID
   const pagesProject = context.env.CF_PAGES_PROJECT
 
-  // --- Write to KV first (fast, reversible if later steps fail) ---
+  // --- Write to KV ---
   const tenantConfig = {
     spaceId,
     name,
@@ -88,22 +87,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
   await context.env.TENANTS_KV.put(domain, JSON.stringify(tenantConfig))
 
-  // --- Create CNAME DNS record ---
-  const pagesHostname = `${pagesProject}.pages.dev`
-  const dnsResult = await cfApi(token, `/zones/${zoneId}/dns_records`, 'POST', {
-    type: 'CNAME',
-    name: domain,
-    content: pagesHostname,
-    proxied: true,
-    comment: `MyVote tenant: ${name}`,
-  })
-
-  if (!dnsResult.success) {
-    // Don't fail — DNS record might already exist or CF handles it differently for subdomain zones
-    console.error('DNS creation warning:', dnsResult.errors)
-  }
-
-  // --- Add custom domain to CF Pages project ---
+  // --- Add custom domain to CF Pages project (triggers SSL cert issuance) ---
+  // Wildcard DNS *.forest.mushroom.cv is already configured; we only need the Pages domain
+  // registration to enable HTTPS for this specific subdomain.
   const pagesResult = await cfApi(
     token,
     `/accounts/${accountId}/pages/projects/${pagesProject}/domains`,
@@ -113,6 +99,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   if (!pagesResult.success) {
     console.error('Pages domain warning:', pagesResult.errors)
+    // Non-fatal: KV is written, domain may still become active if DNS is configured correctly
   }
 
   return Response.json({
