@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale, type AppLocale } from './i18n'
 import { useAuth } from './auth/useAuth'
-import { branding } from './branding'
+import { resolvedBranding as branding } from './tenant'
 
 const { t, locale } = useI18n()
 const auth = useAuth()
