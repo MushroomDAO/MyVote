@@ -2,13 +2,36 @@
  * Cloudflare Pages Middleware
  *
  * Runs at the edge for every request. Responsibilities:
- * 1. /api/graphql proxy → hub.snapshot.org (China connectivity optimization)
+ * 1. /api/graphql proxy → Snapshot Hub, per SNAPSHOT_HUB (China connectivity optimization)
  * 2. /api/* routes → pass through to specific function handlers
  * 3. HTML requests → resolve tenant from KV, inject window.__TENANT__
  */
 
 interface Env {
   TENANTS_KV: KVNamespace
+  /**
+   * Snapshot Hub the /api/graphql proxy forwards to. MUST match the frontend's
+   * VITE_SNAPSHOT_HUB: a testnet (e.g. Sepolia) space exists only on the testnet
+   * hub, so a mainnet proxy would silently read back empty data for it.
+   */
+  SNAPSHOT_HUB?: string
+}
+
+/** Keep in sync with `src/config.ts` (VITE_SNAPSHOT_HUB). */
+const DEFAULT_SNAPSHOT_HUB = 'https://testnet.hub.snapshot.org'
+
+/** Only ever proxy to a known Snapshot hub — never to an arbitrary env-supplied host. */
+const ALLOWED_HUBS = new Set([
+  'https://testnet.hub.snapshot.org',
+  'https://hub.snapshot.org',
+])
+
+function resolveGraphqlEndpoint(env: Env): string {
+  const hub = (env.SNAPSHOT_HUB ?? DEFAULT_SNAPSHOT_HUB).replace(/\/+$/, '')
+  if (!ALLOWED_HUBS.has(hub)) {
+    throw new Error(`SNAPSHOT_HUB is not an allowed Snapshot hub: ${hub}`)
+  }
+  return `${hub}/graphql`
 }
 
 type TenantConfig = {
@@ -22,9 +45,19 @@ type TenantConfig = {
 export const onRequest: PagesFunction<Env> = async (context) => {
   const url = new URL(context.request.url)
 
-  // --- API proxy: /api/graphql → Snapshot Hub ---
+  // --- API proxy: /api/graphql → Snapshot Hub (testnet by default) ---
   if (url.pathname === '/api/graphql') {
-    return fetch('https://hub.snapshot.org/graphql', {
+    let endpoint: string
+    try {
+      endpoint = resolveGraphqlEndpoint(context.env)
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: e instanceof Error ? e.message : String(e) }),
+        { status: 500, headers: { 'content-type': 'application/json' } },
+      )
+    }
+
+    return fetch(endpoint, {
       method: context.request.method,
       headers: { 'content-type': 'application/json' },
       body: context.request.body,

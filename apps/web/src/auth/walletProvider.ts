@@ -9,6 +9,37 @@ function getEthereum(): Eip1193Provider | null {
   return anyWindow.ethereum ?? null
 }
 
+/** EIP-712 domain fields, in canonical order. */
+const DOMAIN_FIELDS = [
+  { name: 'name', type: 'string' },
+  { name: 'version', type: 'string' },
+  { name: 'chainId', type: 'uint256' },
+  { name: 'verifyingContract', type: 'address' },
+  { name: 'salt', type: 'bytes32' }
+] as const
+
+/**
+ * `eth_signTypedData_v4` requires an explicit `EIP712Domain` entry in `types`,
+ * but our payloads follow the ethers/viem convention of omitting it (the KMS and
+ * the Snapshot hub both expect it absent). Re-add it here — and only here — from
+ * the fields the domain actually carries, so the domain separator is unchanged.
+ */
+function withDomainType(typedData: unknown): unknown {
+  if (typeof typedData !== 'object' || typedData === null) return typedData
+
+  const payload = typedData as { domain?: Record<string, unknown>; types?: Record<string, unknown> }
+  if (!payload.domain || !payload.types || payload.types.EIP712Domain) return typedData
+
+  const domain = payload.domain
+  return {
+    ...payload,
+    types: {
+      EIP712Domain: DOMAIN_FIELDS.filter((field) => domain[field.name] !== undefined),
+      ...payload.types
+    }
+  }
+}
+
 export function createWalletProvider(): AuthProvider {
   let user: AuthUser | null = null
 
@@ -52,7 +83,7 @@ export function createWalletProvider(): AuthProvider {
 
       const signature = (await ethereum.request({
         method: 'eth_signTypedData_v4',
-        params: [address, JSON.stringify(typedData)]
+        params: [address, JSON.stringify(withDomainType(typedData))]
       })) as string
 
       return signature

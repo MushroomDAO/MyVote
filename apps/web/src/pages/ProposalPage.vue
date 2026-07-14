@@ -2,13 +2,14 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { providers } from 'ethers'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
 import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME, SNAPSHOT_HUB_URL } from '../config'
 import { useAuth } from '../auth/useAuth'
-import { fetchProposal, type Proposal } from '../lib/graphql'
+import { KmsNotConfiguredError } from '../auth/kms'
+import { fetchProposal, type Proposal, type ProposalType } from '../lib/graphql'
+import { castVote, type VoteChoice } from '../lib/snapshotVote'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -80,6 +81,17 @@ async function loadProposal() {
   }
 }
 
+/**
+ * The ballot UI is single-select, but Snapshot encodes `choice` differently per
+ * proposal type — and the EIP-712 type variant must match, or the hub rejects
+ * the vote. Project the selected 1-based index onto the right shape.
+ */
+function encodeChoice(type: ProposalType, choiceIndex: number): VoteChoice {
+  if (type === 'approval' || type === 'ranked-choice') return [choiceIndex]
+  if (type === 'weighted' || type === 'quadratic') return { [String(choiceIndex)]: 1 }
+  return choiceIndex
+}
+
 async function submitVote() {
   if (!proposal.value) return
   if (!selectedChoice.value) {
@@ -95,28 +107,33 @@ async function submitVote() {
       await auth.connect()
     }
 
-    const ethereum = (window as unknown as { ethereum?: unknown }).ethereum
-    if (!ethereum) throw new Error('No injected wallet found')
+    // Sign through the active auth provider — wallet or AirAccount/KMS. The page
+    // no longer touches window.ethereum, so the provider abstraction holds.
+    const address = auth.user.value?.address
+    if (!address) throw new Error(t('noAccount'))
 
-    const web3 = new providers.Web3Provider(ethereum as any)
-    const accounts = await web3.listAccounts()
-    const account = accounts?.[0]
-    if (!account) throw new Error('No account selected')
-
-    const snapshot = (await import('@snapshot-labs/snapshot.js')).default as any
-    const client = new snapshot.Client712(SNAPSHOT_HUB_URL)
-    const receipt = await client.vote(web3, account, {
-      space: proposal.value.space.id,
-      proposal: proposal.value.id,
-      type: proposal.value.type,
-      choice: selectedChoice.value,
-      reason: reason.value,
-      app: SNAPSHOT_APP_NAME
+    const receipt = await castVote({
+      hubUrl: SNAPSHOT_HUB_URL,
+      vote: {
+        from: address,
+        space: proposal.value.space.id,
+        proposal: proposal.value.id,
+        type: proposal.value.type,
+        choice: encodeChoice(proposal.value.type, selectedChoice.value),
+        reason: reason.value,
+        app: SNAPSHOT_APP_NAME
+      },
+      signTypedData: (typedData) => auth.provider.value.signTypedData({ address, typedData })
     })
 
     voteReceipt.value = receipt
   } catch (e) {
-    voteError.value = e instanceof Error ? e.message : String(e)
+    if (e instanceof KmsNotConfiguredError) {
+      // Expected until E-5 lands: AirAccount signing has no backend yet.
+      voteError.value = t('kmsPending')
+    } else {
+      voteError.value = e instanceof Error ? e.message : String(e)
+    }
   } finally {
     submittingVote.value = false
   }

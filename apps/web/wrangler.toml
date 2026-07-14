@@ -18,6 +18,12 @@ preview_id = "34c1c5f2e50243d1992af2f547151140"
 [vars]
 CF_ROOT_DOMAIN = "forest.mushroom.cv"
 
+# Snapshot Hub the /api/graphql edge proxy forwards to.
+# MUST match the frontend's VITE_SNAPSHOT_HUB — a Sepolia space lives only on the
+# testnet hub, so a mismatch makes the read path return empty data.
+# Allowed: https://testnet.hub.snapshot.org | https://hub.snapshot.org
+SNAPSHOT_HUB = "https://testnet.hub.snapshot.org"
+
 # Local dev:
 #   pnpm run build
 #   wrangler pages dev dist/
