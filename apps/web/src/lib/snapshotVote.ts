@@ -189,7 +189,19 @@ export async function submitVoteEnvelope(
           (payload as Record<string, unknown>).error ??
           text)
         : text
-    throw new Error(`Snapshot hub 拒绝了投票 (${response.status}): ${String(detail).slice(0, 300)}`)
+    const message = String(detail).slice(0, 300)
+
+    // The sequencer rejects a message whose timestamp drifts too far from its own
+    // clock. That reads as an opaque "invalid timestamp" — name the real cause,
+    // because the fix is on the user's machine, not in the app.
+    if (/timestamp/i.test(message)) {
+      throw new Error(
+        `Snapshot hub 拒绝了投票:签名时间戳超出允许范围 (${message})。` +
+          `通常是本机系统时间不准,请校准后重试。`
+      )
+    }
+
+    throw new Error(`Snapshot hub 拒绝了投票 (${response.status}): ${message}`)
   }
 
   return payload

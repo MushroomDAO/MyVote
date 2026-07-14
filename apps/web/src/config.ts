@@ -38,6 +38,21 @@ export const COS72_API_ORIGIN = stripTrailingSlash(getEnv('VITE_COS72_API') ?? '
 export const COS72_API_BASE = COS72_API_ORIGIN ? `${COS72_API_ORIGIN}/api/v1` : ''
 
 /**
+ * cos72's SSO start page — where MyVote sends a user who has no session. MyVote
+ * appends `?redirect_uri=<origin+path>`; the page is expected to ensure the user
+ * is logged in to cos72, call `POST /api/v1/sso/authorize` with that
+ * `redirect_uri` (it needs the cos72 JWT, which only a cos72 first-party page
+ * holds), and redirect back with `?code=<64 hex>`.
+ *
+ * !! PENDING ON THE cos72 SIDE: this landing page does not exist yet. The API
+ * (`/sso/authorize`) is guarded by `JwtAuthGuard`, so MyVote cannot mint a code
+ * itself. Until cos72 ships the page, point this at whatever route they land on.
+ */
+export const COS72_AUTHORIZE_URL =
+  getEnv('VITE_COS72_AUTHORIZE_URL') ??
+  (COS72_API_ORIGIN ? `${COS72_API_ORIGIN}/sso/start` : '')
+
+/**
  * When true this is an AirAccount-only deployment: the wallet provider is
  * hidden from the UI and AirAccount is the default provider.
  */

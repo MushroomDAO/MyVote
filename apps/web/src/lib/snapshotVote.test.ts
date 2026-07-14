@@ -194,6 +194,27 @@ describe('castVote', () => {
     ).rejects.toThrow(/no voting power/)
   })
 
+  it('explains a timestamp rejection as clock skew, not an opaque hub error', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: 'invalid_message', error_description: 'invalid timestamp' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    )
+
+    const promise = castVote({
+      hubUrl: 'https://testnet.hub.snapshot.org',
+      vote: { ...baseVote(), type: 'single-choice', choice: 1 },
+      signTypedData: vi.fn().mockResolvedValue('0xsig'),
+      fetchImpl: fetchImpl as unknown as typeof fetch
+    })
+
+    // The sequencer rejects a timestamp too far from its own clock; the fix is on
+    // the user's machine, so the message has to say so.
+    await expect(promise).rejects.toThrow(/系统时间/)
+    await expect(promise).rejects.toThrow(/invalid timestamp/)
+  })
+
   it('does not POST when signing fails', async () => {
     const fetchImpl = vi.fn()
 

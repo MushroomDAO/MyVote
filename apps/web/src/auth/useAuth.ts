@@ -2,7 +2,11 @@ import { computed, ref } from 'vue'
 
 import { SSO_ONLY } from '../config'
 import type { AuthProvider, AuthProviderId, AuthUser } from './types'
-import { createAirAccountBridge } from './airAccountBridge'
+import {
+  createAirAccountBridge,
+  SsoCodeRejectedError,
+  SsoRedirectingError
+} from './airAccountBridge'
 import { createAirAccountProvider } from './airAccountProvider'
 import { createWalletProvider } from './walletProvider'
 
@@ -64,6 +68,12 @@ export function useAuth() {
     try {
       user.value = await provider.value.connect()
     } catch (e) {
+      // The AirAccount provider "fails" by navigating to cos72. The page is on
+      // its way out — don't flash an error banner on the way.
+      if (e instanceof SsoRedirectingError) {
+        user.value = null
+        return
+      }
       error.value = e instanceof Error ? e.message : String(e)
       user.value = null
       throw e
@@ -80,18 +90,27 @@ export function useAuth() {
   }
 
   /**
-   * Silently restores an AirAccount session on app start: consumes a `?code=`
-   * handed over by cos72, or revalidates a stored token. This is not
-   * user-initiated, so a failure just leaves the app logged out instead of
-   * flashing an error banner.
+   * Restores an AirAccount session on app start: consumes a `?code=` handed over
+   * by cos72, or revalidates a stored token.
+   *
+   * Uses `restore()` rather than `connect()` so an anonymous visitor is never
+   * bounced to cos72 just for opening a page — the redirect is reserved for an
+   * explicit Login click.
    */
   async function restoreSession(): Promise<void> {
     if (!detectSsoSession()) return
     activeProviderId.value = 'airaccount'
     try {
-      user.value = await providersById.airaccount.connect()
-    } catch {
+      user.value = await airAccountBridge.restore()
+    } catch (e) {
       user.value = null
+      // A dead code (spent/expired/mismatched) is a terminal state the user has
+      // to act on. Say so — swallowing it silently while the wallet entry stays
+      // disabled is exactly the dead end we're avoiding.
+      if (e instanceof SsoCodeRejectedError) {
+        error.value = `${e.message}(请重新登录)`
+      }
+      // Anything else (no session yet, network blip) stays quiet: not user-initiated.
     } finally {
       ssoSessionActive.value = detectSsoSession()
     }
