@@ -545,11 +545,25 @@ describe('AirAccount bridge — fixed callback + deep-link state (OAuth style)',
     expect(bridge.consumeReturnTo()).toBe('/proposal/0xabc')
   })
 
-  it('refuses an off-site returnTo', () => {
+  // A returnTo must never become an off-origin navigation. `/evil.com` and
+  // `/%09/evil.com` ARE accepted — they are ordinary paths on our own origin,
+  // and Vue Router treats them as such (no external navigation).
+  it.each([
+    ['https://evil.com', null, 'absolute URL'],
+    ['http://evil.com/pwn', null, 'absolute URL'],
+    ['//evil.com', null, 'protocol-relative'],
+    ['//evil.example.com/pwn', null, 'protocol-relative'],
+    ['%2F%2Fevil.com', null, 'encoded, no leading slash'],
+    ['/%2F%2Fevil.com', null, 'encoded protocol-relative — decodes to ///evil.com'],
+    ['/\\evil.com', null, 'backslash — browsers fold /\\ into //'],
+    ['/evil.com', '/evil.com', 'same-origin path that merely looks like a host'],
+    ['/%09/evil.com', '/%09/evil.com', 'same-origin path with an encoded tab'],
+    ['/proposal/0xabc?ref=x#frag', '/proposal/0xabc?ref=x#frag', 'ordinary deep link']
+  ])('returnTo %s -> %s (%s)', (stored, expected, _why) => {
     const h = createHarness()
-    h.session.setItem(RETURN_TO_STORAGE_KEY, '//evil.example.com/pwn')
+    h.session.setItem(RETURN_TO_STORAGE_KEY, stored)
 
-    expect(createAirAccountBridge(h.options).consumeReturnTo()).toBeNull()
+    expect(createAirAccountBridge(h.options).consumeReturnTo()).toBe(expected)
   })
 
   it('disconnect clears the pending deep link', async () => {
@@ -560,5 +574,85 @@ describe('AirAccount bridge — fixed callback + deep-link state (OAuth style)',
     await bridge.disconnect()
 
     expect(h.session.getItem(RETURN_TO_STORAGE_KEY)).toBeNull()
+  })
+})
+
+/**
+ * The interactive/silent race: App-mount restore() is in flight when the user
+ * clicks Login. connect() must never inherit restore()'s silence — clicking
+ * Login always ends in a session or a trip to cos72.
+ */
+describe('AirAccount bridge — Login never silently no-ops', () => {
+  it('escalates to a redirect when a concurrent silent restore finds the session invalid', async () => {
+    const h = createHarness()
+    storeSession(h)
+
+    // The stored token is dead: verify says so.
+    let releaseVerify: (r: Response) => void = () => {}
+    h.fetchImpl.mockImplementationOnce(
+      () => new Promise<Response>((resolve) => { releaseVerify = resolve })
+    )
+
+    const bridge = createAirAccountBridge(h.options)
+
+    // App mount: silent restore starts and blocks on /sso/verify.
+    const restoring = bridge.restore()
+    // User does not wait — clicks Login while that is still in flight.
+    const connecting = bridge.connect()
+
+    releaseVerify(jsonResponse({ valid: false }))
+
+    await expect(restoring).rejects.toThrow(SsoCodeRejectedError)
+    // The click must produce a redirect, not a silent failure.
+    await expect(connecting).rejects.toThrow(SsoRedirectingError)
+
+    expect(h.navigate).toHaveBeenCalledTimes(1)
+    const [navigatedTo] = h.navigate.mock.calls[0] as [string]
+    expect(new URL(navigatedTo).searchParams.get('redirect_uri')).toBe(REDIRECT_URI)
+    expect(h.session.getItem(SESSION_STORAGE_KEY)).toBeNull()
+  })
+
+  it('escalates to a redirect when a concurrent silent restore finds no session at all', async () => {
+    const h = createHarness()
+    const bridge = createAirAccountBridge(h.options)
+
+    const [restoreResult, connectResult] = await Promise.allSettled([
+      bridge.restore(),
+      bridge.connect()
+    ])
+
+    expect(restoreResult.status).toBe('rejected')
+    expect(connectResult.status).toBe('rejected')
+    expect((connectResult as PromiseRejectedResult).reason).toBeInstanceOf(SsoRedirectingError)
+    expect(h.navigate).toHaveBeenCalledTimes(1)
+  })
+
+  it('a silent restore joining an interactive flight still shares the single code exchange', async () => {
+    const h = createHarness(`${APP_URL}?code=${CODE}`)
+    h.fetchImpl.mockResolvedValue(
+      jsonResponse({ token: 'jwt-1', aaAddress: AA_ADDRESS, expiresIn: 600 })
+    )
+
+    const bridge = createAirAccountBridge(h.options)
+    const [a, b] = await Promise.all([bridge.connect(), bridge.restore()])
+
+    // The single-use code is spent exactly once, and nobody gets redirected.
+    expect(h.fetchImpl).toHaveBeenCalledTimes(1)
+    expect(h.navigate).not.toHaveBeenCalled()
+    expect(a.address).toBe(AA_ADDRESS)
+    expect(b.address).toBe(AA_ADDRESS)
+  })
+
+  it('a successful silent restore satisfies a concurrent Login — no redundant redirect', async () => {
+    const h = createHarness()
+    storeSession(h)
+    h.fetchImpl.mockResolvedValue(jsonResponse({ valid: true, aaAddress: AA_ADDRESS }))
+
+    const bridge = createAirAccountBridge(h.options)
+    const [a, b] = await Promise.all([bridge.restore(), bridge.connect()])
+
+    expect(a.address).toBe(AA_ADDRESS)
+    expect(b.address).toBe(AA_ADDRESS)
+    expect(h.navigate).not.toHaveBeenCalled()
   })
 })

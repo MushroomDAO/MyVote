@@ -204,8 +204,12 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
     options.replaceUrl ?? ((url: string) => window.history.replaceState(null, '', url))
   const navigate = options.navigate ?? ((url: string) => window.location.assign(url))
 
-  /** Dedupes concurrent connect()/restore() calls — the login code is single-use. */
-  let inFlight: Promise<AuthUser> | null = null
+  /**
+   * Dedupes concurrent connect()/restore() calls — the login code is single-use.
+   * The mode is recorded so an interactive caller never silently inherits a
+   * silent flight's "do not redirect" behaviour (see `run`).
+   */
+  let inFlight: { interactive: boolean; promise: Promise<AuthUser> } | null = null
   let currentUser: AuthUser | null = null
 
   function requireApiBase(): string {
@@ -287,12 +291,34 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
     return redirectUri
   }
 
+  /**
+   * A returnTo must be a same-origin absolute path — never something the router
+   * (or a browser normalising it) could turn into an off-site navigation.
+   *
+   * Rejects: absolute URLs (`https://evil.com`), protocol-relative (`//evil.com`),
+   * and their percent-encoded disguises (`/%2F%2Fevil.com` decodes to `///evil.com`)
+   * plus the backslash variant browsers fold into `//`.
+   *
+   * `/evil.com` is fine — it is just a path on our own origin.
+   */
+  function isSafeReturnTo(value: string): boolean {
+    if (!value.startsWith('/')) return false
+
+    let decoded: string
+    try {
+      decoded = decodeURIComponent(value)
+    } catch {
+      return false // malformed escapes — don't guess
+    }
+
+    // `//host`, `/\host` (and `/\/`, `//\`) all navigate off-origin.
+    return !/^\/[\\/]/.test(value) && !/^\/[\\/]/.test(decoded)
+  }
+
   function consumeReturnTo(): string | null {
     const value = store?.getItem(RETURN_TO_STORAGE_KEY) ?? null
     store?.removeItem(RETURN_TO_STORAGE_KEY)
-    // Must be a same-site absolute path — never let a stored value become an
-    // off-site redirect. (It's our own sessionStorage, but belt and braces.)
-    if (!value || !value.startsWith('/') || value.startsWith('//')) return null
+    if (!value || !isSafeReturnTo(value)) return null
     return value
   }
 
@@ -478,13 +504,40 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
     return currentUser
   }
 
-  /** Serialises connect()/restore() so a single-use code is never spent twice. */
-  function run(interactive: boolean): Promise<AuthUser> {
-    if (inFlight) return inFlight
-    inFlight = resolveSession(interactive).finally(() => {
-      inFlight = null
+  function launch(interactive: boolean): Promise<AuthUser> {
+    const promise = resolveSession(interactive).finally(() => {
+      // Only retire our own flight — a later one may already have replaced it.
+      if (inFlight?.promise === promise) inFlight = null
     })
-    return inFlight
+    inFlight = { interactive, promise }
+    return promise
+  }
+
+  /**
+   * Serialises connect()/restore() so a single-use code is never spent twice —
+   * while preserving the invariant that clicking Login ALWAYS ends in either a
+   * session or a trip to cos72, never in silence.
+   *
+   * The trap: App-mount `restore()` (silent) is already in flight when the user
+   * clicks Login. If `connect()` simply joined that promise, a stored-but-rejected
+   * session would take the silent path — which clears the session and does NOT
+   * redirect, because redirecting is gated on `interactive`. The user clicks Login
+   * and nothing happens.
+   *
+   * So an interactive caller that lands on a silent flight *waits* for it, and if
+   * it did not produce a session, escalates: it runs its own interactive pass,
+   * which redirects. Sharing the flight keeps the code-exchange de-duplicated
+   * (the escalated pass finds the code already spent and gone from the URL);
+   * splitting the two flights instead would reopen the double-spend hole.
+   */
+  function run(interactive: boolean): Promise<AuthUser> {
+    const existing = inFlight
+    if (existing) {
+      if (!interactive || existing.interactive) return existing.promise
+      // Interactive caller joined a silent flight — never inherit its silence.
+      return existing.promise.catch(() => launch(true))
+    }
+    return launch(interactive)
   }
 
   function requireToken(address: string): SsoSession {
