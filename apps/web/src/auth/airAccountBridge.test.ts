@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createAirAccountBridge,
   REDIRECT_URI_STORAGE_KEY,
+  RETURN_TO_STORAGE_KEY,
   SESSION_STORAGE_KEY,
   SsoCodeRejectedError,
   SsoNoSessionError,
@@ -17,7 +18,10 @@ const AUTHORIZE_URL = 'https://cos72.test/sso/start'
 const CODE = 'a'.repeat(64)
 const AA_ADDRESS = '0x1111111111111111111111111111111111111111'
 const APP_URL = 'https://myvote.test/proposal/0xabc'
-const REDIRECT_URI = 'https://myvote.test/proposal/0xabc'
+/** Fixed callback — deliberately NOT the page the user is on. */
+const CALLBACK_PATH = '/sso/callback'
+const REDIRECT_URI = 'https://myvote.test/sso/callback'
+const CALLBACK_URL = `https://myvote.test${CALLBACK_PATH}`
 
 /** In-memory Storage stand-in. */
 function createStorage() {
@@ -63,6 +67,7 @@ function createHarness(initialUrl = APP_URL): Harness {
     options: {
       apiBase: API_BASE,
       authorizeUrl: AUTHORIZE_URL,
+      callbackPath: CALLBACK_PATH,
       fetchImpl: fetchImpl as unknown as typeof fetch,
       sessionStorage: session,
       getUrl: () => url.current,
@@ -122,7 +127,7 @@ describe('AirAccount bridge — code exchange', () => {
     expect(h.session.getItem(REDIRECT_URI_STORAGE_KEY)).toBeNull()
   })
 
-  it('falls back to origin+path when no redirect_uri was stashed', async () => {
+  it('falls back to the fixed callback URI when none was stashed', async () => {
     h.fetchImpl.mockResolvedValueOnce(
       jsonResponse({ token: 'jwt-1', aaAddress: AA_ADDRESS, expiresIn: 600 })
     )
@@ -422,13 +427,15 @@ describe('AirAccount bridge — expiry and storage', () => {
 })
 
 describe('AirAccount bridge — login preparation and signing', () => {
-  it('prepareLogin stores a query/hash-free redirect_uri', () => {
+  it('prepareLogin pins redirect_uri to the fixed callback and stashes the deep link', () => {
     const h = createHarness(`${APP_URL}?foo=1#bar`)
 
     const redirectUri = createAirAccountBridge(h.options).prepareLogin()
 
     expect(redirectUri).toBe(REDIRECT_URI)
     expect(h.session.getItem(REDIRECT_URI_STORAGE_KEY)).toBe(REDIRECT_URI)
+    // Where the user was headed rides in local state, NOT in the redirect_uri.
+    expect(h.session.getItem(RETURN_TO_STORAGE_KEY)).toBe('/proposal/0xabc?foo=1#bar')
   })
 
   it('signing delegates to the KMS with the session token and address', async () => {
@@ -490,5 +497,68 @@ describe('AirAccount bridge — configuration', () => {
 
     await expect(bridge.connect()).rejects.toThrow(/VITE_COS72_API/)
     expect(h.fetchImpl).not.toHaveBeenCalled()
+  })
+})
+
+describe('AirAccount bridge — fixed callback + deep-link state (OAuth style)', () => {
+  it('redirect_uri is the fixed callback path, whatever page login starts from', () => {
+    for (const from of [
+      'https://myvote.test/',
+      'https://myvote.test/explore',
+      'https://myvote.test/proposal/0xabc?ref=x#frag',
+      'https://myvote.test/space/aastar.eth'
+    ]) {
+      const h = createHarness(from)
+
+      // cos72 whitelists ONE exact URL; a per-page redirect_uri would force a
+      // bare-origin whitelist and hand a live code to any sink on the domain.
+      expect(createAirAccountBridge(h.options).prepareLogin()).toBe(REDIRECT_URI)
+    }
+  })
+
+  it('consumeReturnTo returns the deep link once, then clears it', () => {
+    const h = createHarness('https://myvote.test/proposal/0xabc?ref=x')
+    const bridge = createAirAccountBridge(h.options)
+
+    bridge.prepareLogin()
+
+    expect(bridge.consumeReturnTo()).toBe('/proposal/0xabc?ref=x')
+    expect(bridge.consumeReturnTo()).toBeNull()
+    expect(h.session.getItem(RETURN_TO_STORAGE_KEY)).toBeNull()
+  })
+
+  it('consumeReturnTo yields null when login started with no deep link', () => {
+    const h = createHarness(CALLBACK_URL)
+
+    expect(createAirAccountBridge(h.options).consumeReturnTo()).toBeNull()
+  })
+
+  it('a retry from the callback page keeps the pending deep link', () => {
+    const h = createHarness('https://myvote.test/proposal/0xabc')
+    const bridge = createAirAccountBridge(h.options)
+    bridge.prepareLogin()
+
+    // Exchange failed; the user is now sitting on /sso/callback and hits retry.
+    h.url.current = CALLBACK_URL
+    bridge.prepareLogin()
+
+    expect(bridge.consumeReturnTo()).toBe('/proposal/0xabc')
+  })
+
+  it('refuses an off-site returnTo', () => {
+    const h = createHarness()
+    h.session.setItem(RETURN_TO_STORAGE_KEY, '//evil.example.com/pwn')
+
+    expect(createAirAccountBridge(h.options).consumeReturnTo()).toBeNull()
+  })
+
+  it('disconnect clears the pending deep link', async () => {
+    const h = createHarness('https://myvote.test/proposal/0xabc')
+    const bridge = createAirAccountBridge(h.options)
+    bridge.prepareLogin()
+
+    await bridge.disconnect()
+
+    expect(h.session.getItem(RETURN_TO_STORAGE_KEY)).toBeNull()
   })
 })

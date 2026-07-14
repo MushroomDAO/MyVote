@@ -116,6 +116,34 @@ export function useAuth() {
     }
   }
 
+  /**
+   * Completes the SSO round-trip on the `/sso/callback` page: exchanges the
+   * `?code=` for a session and reports where the user was originally headed.
+   *
+   * Uses `restore()` (never redirects) — the callback page must show a failure,
+   * not bounce back to cos72 in a loop. Throws on failure so the page can render
+   * the error and offer "log in again".
+   */
+  async function completeSsoLogin(): Promise<string> {
+    activeProviderId.value = 'airaccount'
+    try {
+      user.value = await airAccountBridge.restore()
+      return airAccountBridge.consumeReturnTo() ?? '/'
+    } catch (e) {
+      user.value = null
+      error.value = e instanceof Error ? e.message : String(e)
+      throw e
+    } finally {
+      ssoSessionActive.value = detectSsoSession()
+    }
+  }
+
+  /** Sends the user to cos72 to log in. Used by the callback page's retry button. */
+  async function startLogin(): Promise<void> {
+    activeProviderId.value = 'airaccount'
+    await connect()
+  }
+
   return {
     activeProviderId,
     provider,
@@ -127,6 +155,8 @@ export function useAuth() {
     setProvider,
     connect,
     disconnect,
-    restoreSession
+    restoreSession,
+    completeSsoLogin,
+    startLogin
   }
 }

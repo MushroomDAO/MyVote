@@ -24,6 +24,7 @@
     "@types/dompurify": "^3.2.0",
     "@types/node": "^24.10.1",
     "@vitejs/plugin-vue": "^6.0.2",
+    "@vue/test-utils": "^2.4.11",
     "@vue/tsconfig": "^0.8.1",
     "happy-dom": "^20.10.6",
     "typescript": "~5.9.3",

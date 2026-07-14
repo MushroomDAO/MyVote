@@ -1,4 +1,4 @@
-import { COS72_API_BASE, COS72_AUTHORIZE_URL } from '../config'
+import { COS72_API_BASE, COS72_AUTHORIZE_URL, SSO_CALLBACK_PATH } from '../config'
 import type { AirAccountAdapter } from './airAccountProvider'
 import {
   createPlaceholderKmsSigner,
@@ -12,8 +12,15 @@ import type { AuthUser, SignTypedDataParams } from './types'
  *
  * ## Login flow
  *
- * 1. A user with no session clicks Login. `connect()` stashes a `redirect_uri`
- *    (current origin + path) and navigates to cos72's SSO start page.
+ * 1. A user with no session clicks Login. `connect()` stashes the `redirect_uri`
+ *    (always `origin + SSO_CALLBACK_PATH` — a single fixed path, never the page
+ *    the user is on) plus a `returnTo` (where they actually wanted to go), and
+ *    navigates to cos72's SSO start page.
+ *
+ *    The fixed callback is what keeps cos72's whitelist tight: it registers one
+ *    exact path. A bare-origin whitelist would hand a live code to any
+ *    open-redirect or XSS sink anywhere on the MyVote domain. The deep-link
+ *    target rides along in local state instead of in the redirect_uri.
  *
  *    Why a *page* and not an API call: `POST /sso/authorize` sits behind cos72's
  *    `JwtAuthGuard` — it mints a code for an *already logged-in cos72 user*, so
@@ -49,6 +56,12 @@ import type { AuthUser, SignTypedDataParams } from './types'
 export const SESSION_STORAGE_KEY = 'myvote.sso.session'
 /** sessionStorage key holding the redirect_uri of the in-flight login. */
 export const REDIRECT_URI_STORAGE_KEY = 'myvote.sso.redirect_uri'
+/**
+ * sessionStorage key holding the deep-link the user was headed for — our `state`.
+ * It stays client-side and never touches the redirect_uri, so it cannot widen
+ * cos72's whitelist.
+ */
+export const RETURN_TO_STORAGE_KEY = 'myvote.sso.returnTo'
 
 /**
  * Treat a token as expired this many ms early, so we never start a request with
@@ -103,6 +116,8 @@ export type AirAccountBridgeOptions = {
   apiBase?: string
   /** cos72 SSO start page. `redirect_uri` is appended as a query param. */
   authorizeUrl?: string
+  /** The one path cos72 may redirect back to. Defaults to SSO_CALLBACK_PATH. */
+  callbackPath?: string
   /** Remote signer. Defaults to the E-5 placeholder, which throws on every call. */
   kms?: KmsSigner
   fetchImpl?: typeof fetch
@@ -133,10 +148,16 @@ export interface AirAccountBridge extends AirAccountAdapter {
    */
   restore(): Promise<AuthUser>
   /**
-   * Builds the `redirect_uri` for a login round-trip (origin + path, no query or
-   * hash), persists it for the subsequent `/sso/exchange`, and returns it.
+   * Stashes the fixed `redirect_uri` (for the subsequent `/sso/exchange`, which
+   * demands the exact same string) plus the deep-link the user was headed for,
+   * and returns the redirect_uri.
    */
   prepareLogin(): string
+  /**
+   * Reads and clears the deep-link stashed by `prepareLogin()`. Returns null when
+   * there is none (a bare login → send the user home).
+   */
+  consumeReturnTo(): string | null
   /** True when a login code is in the URL, or a live session is stored. */
   hasSession(): boolean
   /** The stored session if present and unexpired, else null (purging it if expired). */
@@ -170,6 +191,7 @@ async function readErrorMessage(response: Response, fallback: string): Promise<s
 export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): AirAccountBridge {
   const apiBase = (options.apiBase ?? COS72_API_BASE).replace(/\/+$/, '')
   const authorizeUrl = options.authorizeUrl ?? COS72_AUTHORIZE_URL
+  const callbackPath = options.callbackPath ?? SSO_CALLBACK_PATH
   const kms = options.kms ?? createPlaceholderKmsSigner()
   const fetchImpl = options.fetchImpl ?? ((...args: Parameters<typeof fetch>) => fetch(...args))
   const now = options.now ?? (() => Date.now())
@@ -236,16 +258,42 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
     return stored
   }
 
+  /**
+   * Always `origin + callbackPath`. Deliberately independent of the current page:
+   * cos72 whitelists this one exact URL, and `/sso/exchange` compares it
+   * byte-for-byte.
+   */
   function buildRedirectUri(url: string): string {
+    return `${new URL(url).origin}${callbackPath}`
+  }
+
+  /** Where the user was headed, as a router-usable path. Null on the callback page itself. */
+  function currentReturnTo(url: string): string | null {
     const parsed = new URL(url)
-    // No query, no hash — cos72 compares redirect_uri byte-for-byte on exchange.
-    return `${parsed.origin}${parsed.pathname}`
+    if (parsed.pathname === callbackPath) return null
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`
   }
 
   function prepareLogin(): string {
     const redirectUri = buildRedirectUri(getUrl())
     store?.setItem(REDIRECT_URI_STORAGE_KEY, redirectUri)
+
+    // On a normal page: remember where they were. On the callback page (a retry
+    // after a failed exchange): keep whatever deep link is already pending, so a
+    // second attempt still lands them where they meant to go.
+    const returnTo = currentReturnTo(getUrl())
+    if (returnTo) store?.setItem(RETURN_TO_STORAGE_KEY, returnTo)
+
     return redirectUri
+  }
+
+  function consumeReturnTo(): string | null {
+    const value = store?.getItem(RETURN_TO_STORAGE_KEY) ?? null
+    store?.removeItem(RETURN_TO_STORAGE_KEY)
+    // Must be a same-site absolute path — never let a stored value become an
+    // off-site redirect. (It's our own sessionStorage, but belt and braces.)
+    if (!value || !value.startsWith('/') || value.startsWith('//')) return null
+    return value
   }
 
   function readCode(url: string): string | null {
@@ -460,6 +508,7 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
     async disconnect() {
       clearSession()
       clearPendingLogin()
+      store?.removeItem(RETURN_TO_STORAGE_KEY)
     },
 
     async signMessage(address: string, message: string) {
@@ -477,6 +526,8 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
     },
 
     prepareLogin,
+
+    consumeReturnTo,
 
     hasSession() {
       if (readCode(getUrl())) return true

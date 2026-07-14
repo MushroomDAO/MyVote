@@ -38,8 +38,21 @@ export const COS72_API_ORIGIN = stripTrailingSlash(getEnv('VITE_COS72_API') ?? '
 export const COS72_API_BASE = COS72_API_ORIGIN ? `${COS72_API_ORIGIN}/api/v1` : ''
 
 /**
+ * The single, fixed path cos72 is allowed to redirect back to.
+ *
+ * Standard OAuth practice: one exact callback path, never the page the user
+ * happened to be on. cos72 whitelists `https://<myvote-host>/sso/callback` and
+ * nothing else — registering a bare origin would let *any* open-redirect or XSS
+ * sink anywhere on the MyVote domain receive a live SSO code.
+ *
+ * Where the user actually wanted to go is carried in local `state`
+ * (sessionStorage `returnTo`), not in the redirect_uri.
+ */
+export const SSO_CALLBACK_PATH = getEnv('VITE_SSO_CALLBACK_PATH') ?? '/sso/callback'
+
+/**
  * cos72's SSO start page — where MyVote sends a user who has no session. MyVote
- * appends `?redirect_uri=<origin+path>`; the page is expected to ensure the user
+ * appends `?redirect_uri=<origin + SSO_CALLBACK_PATH>`; the page is expected to ensure the user
  * is logged in to cos72, call `POST /api/v1/sso/authorize` with that
  * `redirect_uri` (it needs the cos72 JWT, which only a cos72 first-party page
  * holds), and redirect back with `?code=<64 hex>`.
