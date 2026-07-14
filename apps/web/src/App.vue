@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale, type AppLocale } from './i18n'
 import { useAuth } from './auth/useAuth'
@@ -7,6 +7,15 @@ import { resolvedBranding as branding, tenant } from './tenant'
 
 const { t, locale } = useI18n()
 const auth = useAuth()
+
+// MV-4: in SSO-only mode — or once a cos72 session exists — the wallet provider
+// is not an option, and AirAccount is the only entry in the dropdown.
+const walletDisabled = auth.walletDisabled
+
+onMounted(() => {
+  // Consumes a `?code=` from cos72, or revalidates a stored token. Silent by design.
+  void auth.restoreSession()
+})
 
 const selectedLocale = computed({
   get: () => locale.value as AppLocale,
@@ -51,8 +60,13 @@ async function onConnectClick() {
 
       <div class="actions">
         <label class="label" for="provider">{{ t('loginProvider') }}</label>
-        <select id="provider" v-model="selectedProvider" class="select">
-          <option value="wallet">Wallet</option>
+        <select
+          id="provider"
+          v-model="selectedProvider"
+          class="select"
+          :disabled="walletDisabled"
+        >
+          <option v-if="!walletDisabled" value="wallet">Wallet</option>
           <option value="airaccount">AirAccount</option>
         </select>
 

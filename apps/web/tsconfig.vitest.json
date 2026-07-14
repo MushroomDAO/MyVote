@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.vitest.tsbuildinfo",
+    // Tests may reach for node builtins (e.g. node:crypto) and vitest globals.
+    "types": ["vite/client", "node", "vitest/globals"]
+  },
+  "include": ["src/**/*.test.ts"],
+  "exclude": []
+}
