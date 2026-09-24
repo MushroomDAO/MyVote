@@ -1,3 +1,24 @@
+# Snapshot X 调研笔记（历史存档）
+
+> ⚠️ **2026-09-24 复核：本文档中的多条结论已过时，请勿据此排期。**
+> 当前的选型与路线以 [`docs/snapshot-version-decision.md`](./snapshot-version-decision.md) 和 [`docs/Plan.md`](./Plan.md) 为准。
+>
+> 主要过时点：
+>
+> | 本文档旧结论 | 2026-09 实际 |
+> |---|---|
+> | Snapshot X 以 Starknet 为中心 | SX 已同时部署在 **EVM 多链**（含 **Optimism**）+ Starknet |
+> | 在 OP 原生部署属中长期规划、**不建议自研** | SX 官方已支持 OP，`sx.js` 直接导出 `evmOptimism`，**无需等待官方** |
+> | `mana` 独立仓库、需自行部署 | `mana` 已并入 `sx-monorepo/apps/mana`，官方公共实例为 `mana.snapshot.box` |
+> | `sx.js` 是 SX 专用 SDK | `@snapshot-labs/sx` 已统一覆盖 offchain + SX-EVM + SX-Starknet + Governor |
+> | 官方 UI 参考 `snapshot-labs/sx-ui` | 官方 UI 在 `sx-monorepo/apps/ui`；旧前端更名 `snapshot-v1` |
+>
+> 以下为当时的研究记录，仅作历史参考。
+
+---
+
+## 附：原始调研笔记
+
 先说结论：计划使用SnapshotX作为后端引擎，前端我们基于他们SDK来开发自己的流程，完成后各个社区自己一键部署，或者使用我们的公共的，都可以。
 方案 B：利用现有 Snapshot X 治理 Optimism 资产（目前可行）
 这是目前最通用的做法。如果你的 DAO 资产在 Optimism，但你想用 Snapshot X：

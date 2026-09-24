@@ -10,8 +10,9 @@ This checklist is for new staff to verify what is already implemented in the cur
   - Space detail: `/space/:id`
   - Proposal detail: `/proposal/:id`
 - Docs:
-  - `docs/Plan.md`
-  - `docs/SnapshotX.md`
+  - `docs/Plan.md` — current roadmap
+  - `docs/snapshot-version-decision.md` — backend/SDK selection decision
+  - `docs/SnapshotX.md` — historical research (partly outdated)
 
 ## 1) Prerequisites
 
@@ -65,10 +66,13 @@ Expected:
 
 ## 5) Config (optional)
 
-The app reads these variables:
-- `VITE_SNAPSHOT_GRAPHQL_ENDPOINT` (default: `https://hub.snapshot.org/graphql`)
-- `VITE_SNAPSHOT_HUB_URL` (default: `https://hub.snapshot.org`)
+The app reads these variables (see `apps/web/.env.example`):
+- `VITE_SNAPSHOT_HUB` (default: `https://testnet.hub.snapshot.org`; legacy alias `VITE_SNAPSHOT_HUB_URL`)
+- `VITE_SNAPSHOT_GRAPHQL_ENDPOINT` (default: `${VITE_SNAPSHOT_HUB}/graphql`)
 - `VITE_SNAPSHOT_APP_NAME` (default: `myvote`)
+- `VITE_COS72_API` / `VITE_COS72_AUTHORIZE_URL` / `VITE_SSO_CALLBACK_PATH` / `VITE_SSO_ONLY` (AirAccount SSO)
+
+Note: the default is the **testnet** hub because the target space lives on Sepolia — the mainnet hub does not host it.
 
 Verification steps:
 - Start with defaults (no env vars) and confirm Explore loads.
@@ -98,10 +102,11 @@ Wallet connect:
 - Click again to Disconnect.
 - Expected: address clears.
 
-AirAccount placeholder:
+AirAccount (cos72 SSO):
 - Select `AirAccount`, click Connect.
-- Expected: shows an error like “AirAccount adapter not configured”.
-- This is expected until a Web2 binding adapter is wired.
+- If `VITE_COS72_API` / `VITE_COS72_AUTHORIZE_URL` are unset: expect a configuration error.
+- If configured: expect a redirect to cos72's SSO start page, then a return to `/sso/callback?code=...`.
+- Remote signing (KMS, E-5) is **not delivered**, so submitting a vote via AirAccount still fails with a "KMS not available" error. This is expected.
 
 ## 8) Explore page (spaces)
 
@@ -162,5 +167,7 @@ Expected:
 
 ## 12) Known limitations (current state)
 
-- AirAccount is an adapter interface only; Web2 binding is not implemented yet.
-- Data layer currently uses Snapshot Hub GraphQL; Snapshot X `sx-api` alignment is not completed yet.
+- AirAccount SSO + `KmsSigner` seam are implemented, but the remote KMS signer (E-5) and cos72's SSO landing page are not delivered yet → AirAccount signing throws.
+- Data layer uses the classic off-chain **Snapshot Hub GraphQL**. Snapshot X is a planned *optional* backend — see `docs/snapshot-version-decision.md`.
+- Proposal creation UI and space management UI are not implemented (use snapshot.box / snapshot.org).
+- `POST /api/register` has no auth/rate-limit yet — see `docs/Plan.md` M6.

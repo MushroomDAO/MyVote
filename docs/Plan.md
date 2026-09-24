@@ -1,310 +1,105 @@
-# Plan
+# MyVote 路线图（Plan）
 
-## V1 Open-source Snapshot Interface Plan (Custom Login + zh-CN Default + Multi-language)
-
-### Goal
-- Build an open-source governance portal UI based on Snapshot X, aligned with the official standard implementation.
-- Keep data interoperable with snapshot.box (spaces/proposals/votes created via the same protocol can be indexed and shown by the official explorer).
-- Provide a pluggable login module: standard Web3 wallets + a customizable Web2-style login (e.g. AirAccount).
-- Default language zh-CN, with English and more languages selectable.
-
-### V1 Scope (Must-have)
-- Explore: list/search spaces; view space detail; view proposal detail; show voting power and results.
-- Actions: propose + vote via `sx.js` standard flow; support relayer-based gasless flow (Mana).
-- Auth: an abstract Auth Provider interface; ship at least 2 implementations (Wallet, AirAccount adapter placeholder).
-- I18n: zh-CN default; English; runtime language switch; locale-aware number/date formatting.
-
-### Technical Approach (Follow Official)
-- Protocol/SDK/UI layering: Snapshot X contracts → `sx.js` → Vue3 UI (official-style).
-- Data layer options:
-  - Default: use official GraphQL (`sx-api`) endpoint for identical data and fastest development.
-  - Optional: allow switching to self-hosted `sx-api` for sovereignty.
-- Relayer options:
-  - Default: use official Mana endpoint for gasless voting.
-  - Optional: self-host Mana to customize sponsorship logic.
-
-### Milestones (Do One by One)
-1. Project skeleton: Vue3 + TypeScript; routing; basic layout.
-2. I18n baseline: zh-CN default; English; language switch UI.
-3. Auth baseline: pluggable auth interface; Wallet provider; AirAccount provider stub.
-4. Data baseline: GraphQL client + Explore page listing spaces.
-5. Space/Proposal pages: minimal detail views and loading/error states.
-6. Voting: connect auth → sign → submit (via `sx.js` + relayer); show status/receipt.
-7. Hardening: config via env vars; lint/typecheck/build green.
-
-https://github.com/snapshot-labs/sx-starknet
-https://github.com/snapshot-labs/sx-monorepo
-https://snapshot.box/#/explore
-
-对于 AAStar 这样一个致力于数字公共物品（Digital Public Goods）的开源组织，利用 Snapshot X 的架构来构建基于 OP 的链上投票系统是非常契合的路径。
-
-既然你不仅想“使用”，还想基于此构建自己的**开源投票系统**，你需要深入了解其底层的 SDK 和模块化组件。
+> **最后更新**：2026-09-24
+> **选型决策**：见 [`docs/snapshot-version-decision.md`](./snapshot-version-decision.md)
+> 本文档取代旧版「以 Snapshot X 为唯一后端」的规划；历史调研笔记保留在 [`docs/SnapshotX.md`](./SnapshotX.md) 并已加过时标注。
 
 ---
 
-### 1. 核心 SDK 与 代码仓库 (Repo)
+## 1. 目标
 
-Snapshot X 的开发是高度模块化的，其核心代码托管在 **Snapshot Labs** 的 GitHub 组织下：
+构建一个开源、可白标的社区治理门户：
 
-* **核心协议 (Starknet 合约)**: [sx-starknet](https://github.com/snapshot-labs/sx-starknet)
-* 这是系统的灵魂，包含用 Cairo 编写的 Space、Authenticator、Voting Strategies 等合约。
-
-
-* **前端/集成 SDK**: [sx.js](https://www.google.com/search?q=https://github.com/snapshot-labs/sx.js)
-* **这是你最需要的。** 它是一个 TypeScript SDK，用于与 Snapshot X 协议进行交互。它封装了创建提案、签名、提交投票等所有 API 调用。
-
-
-* **中继器 (Relayer)**: [mana](https://www.google.com/search?q=https://github.com/snapshot-labs/mana)
-* 如果你想为 AAStar 的用户支付 Gas（实现免 Gas 体验），你需要研究这个项目，它是负责将用户的签名转发到 Starknet 的中继层。
-
-
-* **索引器 (Indexer)**: [sx-api](https://www.google.com/search?q=https://github.com/snapshot-labs/sx-api)
-* 用于抓取链上投票数据并提供高效的 GraphQL 查询。
-
-
+- 数据与 [snapshot.box](https://snapshot.box) 互通（同一协议下创建的空间/提案/投票，官方浏览器也能索引展示）。
+- 可插拔登录：标准 Web3 钱包 + Web2 风格登录（AirAccount / cos72 SSO + 远程 KMS 签名）。
+- 默认 zh-CN，可切换英文。
+- 一次部署服务多个社区（按 hostname 解析租户），或为单社区一键部署。
 
 ---
 
-### 2. 你已有的功能 vs. 你需要做的工作
+## 2. 路线决策摘要（详见决策文档）
 
-利用 Snapshot X 的成熟架构，你不需要从零开发 ZK 证明或计票引擎。
-
-#### **已有功能（直接调用 SDK 即可）：**
-
-1. **身份核验 (Authenticators)**：支持通过以太坊签名验证身份。
-2. **跨链验证 (Storage Proofs)**：通过 Herodotus 自动验证 Optimism 上的代币余额。
-3. **提案管理**：提案的创建、状态变更逻辑已在合约中。
-4. **免 Gas 投票**：通过 Mana 中继器实现的元交易支持。
-
-#### **AAStar 需要做的工作：**
-
-1. **定制化前端 (UI/UX)**：Snapshot X 的官方 UI 是通用的。AAStar 需要基于 `sx.js` 构建一个符合你们社区审美和功能的“治理门户”。
-2. **配置执行策略 (Execution Strategies)**：如果你希望提案通过后自动在 Optimism 上执行（比如转账），你需要编写或配置一个 **L2 Execution Strategy**（通常涉及 Starknet 到 OP 的跨链消息传递）。
-3. **存储证明策略配置**：为你们的 OP 代币编写一个特定的 `Voting Strategy` 配置文件，指明代币合约地址和存储槽（Slot）。
+| 维度 | 选择 |
+|---|---|
+| **协议后端** | **经典链下 Snapshot 为主**（Hub GraphQL + EIP-712），Snapshot X（EVM/OP）作为可选升级后端 |
+| **SDK 基座** | 新版 `@snapshot-labs/sx` / `lock` / `tune`（不再投入 `snapshot-v1` / 以 `snapshot.js` 为主 SDK） |
+| **前端** | 保持自研精简 SPA（Vue 3），不整体 fork `apps/ui` |
+| **写路径** | 抽象 `VoteBackend` 接口，链下为默认实现，SX 为可选实现 |
 
 ---
 
-### 3. 给 AAStar 的 Action Plan (行动指南)
+## 3. 当前状态
 
-作为开源项目的负责人，你可以按照以下四个阶段推进：
+| 里程碑 | 内容 | 状态 |
+|---|---|---|
+| **M1** Clone & Deploy | 品牌单文件定制、CSS 变量主题、Explore/Space/Proposal 三页、EIP-712 投票、Markdown 正文、zh-CN/en、分页 | ✅ 完成 |
+| **M2** Multi-Tenant | 边缘 `_middleware.ts` 从 **KV** 解析 hostname → 注入 `window.__TENANT__`；`/api/graphql` 代理（国内连通） | ✅ 完成 |
+| **M2.5** 自助注册 | `api/register.ts` 自助子域名注册 + 名称可用性检查；CF 代理 + 内存缓存 + 刷新 | ✅ 完成（**待安全加固**，见 M6） |
+| **AirAccount** | cos72 SSO 会话 + 远程 KMS 签名适配层 | 🟡 管道已通，**KMS 后端（E-5）未交付** |
 
-#### **阶段一：原型验证 (Technical Spike) —— 预计 1-2 周**
-
-* **任务**：在 Starknet Sepolia 测试网和 OP Goerli 上跑通一个完整的投票流。
-* **动作**：使用 `sx.js` 尝试创建一个测试 Space，配置一个读取 OP 测试币余额的投票策略。
-* **目标**：确认能够成功从 OP 读取余额并在 Starknet 计票。
-
-#### **阶段二：前端门户开发 (Custom UI) —— 预计 3-4 周**
-
-* **任务**：构建 AAStar 专属的开源投票界面。
-* **动作**：集成 `sx.js` 和 `Ethers.js`。
-* **关键点**：实现用户连接钱包、查看 OP 资产权重、签名投票的流畅体验。
-
-#### **阶段三：Gasless 机制搭建 (Infrastructure) —— 预计 2 周**
-
-* **任务**：实现用户的“零成本”参与。
-* **动作**：部署或接入 `Mana` 中继服务，为 AAStar 的空间配置 Gas 支付来源（利用你的 **SuperPaymaster** 研究背景，这里可以做深度的学术与实践结合）。
-
-#### **阶段四：链上自动执行集成 (On-chain Execution) —— 预计 4 周**
-
-* **任务**：实现“治理即代码”。
-* **动作**：研究 Starknet 官方跨链桥（Messaging）的异步调用。当 Starknet 上的提案通过时，自动向 Optimism 发送一个消息，触发 OP 上的合约动作。
+当前数据层默认指向 **testnet hub**（`https://testnet.hub.snapshot.org`），因为目标是 Sepolia 空间。
 
 ---
 
-### 架构示意图参考
+## 4. 后续里程碑
 
-### 下一步建议
+### M3 — 多后端写路径与前端稳健性（进行中）
 
-由于你正在研究 **SuperPaymaster**，你可以尝试将 **AAStar 的投票系统** 作为你 PhD 论文的一个 **实验用例 (Case Study)**：
+**目标**：把「链下专用」的投票写路径抽象成可替换后端，并补齐读取路径的健壮性与测试。
 
-* **切入点**：研究如何利用 Paymaster 机制，不仅在 ERC-4337 中优化 Gas，还能在跨链治理（Snapshot X 场景）中通过“信誉值”或“社会资本”来实现动态的 Gas 补贴。
+- [ ] 抽出 `VoteBackend` 接口，`snapshotVote.ts` 作为链下默认实现（不改行为）。
+- [ ] 读取路径加**过期响应守卫**（请求令牌），修 `SpacePage` / `ProposalPage` / `ExplorePage` 的乱序覆盖竞态（见 `docs/architecture-review.md` 建议 1）。
+- [ ] 补读取路径测试：`lib/graphql.ts`、`lib/cache.ts`、三个页面组件的分页/缓存逻辑。
+- [ ] 投票后失效相关缓存；Explore 缓存 key 按租户隔离。
+- [ ] 错误信息接入 i18n（去掉硬编码中文）。
 
-这是一个非常核心的工程问题。简单来说：**免 Gas 并不是前端自带的魔法，而是由一个名为 “Mana” 的中继服务（Relayer）支撑的。**
+### M4 — AirAccount 生产可用（外部阻塞）
 
-既然你要为 AAStar 开发自己的前端，你需要理解这个“赞助机制”是如何运作的。
+**目标**：Web2 登录 + 免助记词投票真正可用。
 
-### 1. 为什么会有 Gas？
+- [ ] **E-5**：KMS HTTP 签名端点（`signTypedData` / `signMessage`）落地，替换 `createPlaceholderKmsSigner()`。
+- [ ] **cos72**：SSO 授权落地页（`/sso/authorize` 前的第一方页面）上线；`VITE_COS72_AUTHORIZE_URL` 指向它。
+- [ ] cos72 refresh endpoint 就绪后，把 SSO token 从 `sessionStorage` 迁到内存 + HttpOnly 刷新 Cookie。
+- [ ] E2E：Web2 登录 → 投票全链路。
 
-虽然用户只是签名（离线、免费），但要让这个票数在 Starknet 链上生效，必须有人发送一笔交易把签名带上链。
+> 上述两项均依赖外部团队，MyVote 侧已完成并可配置，属**等待型阻塞**。
 
-* **如果不使用中继器**：你的前端需要提示用户切换到 Starknet 钱包，并支付 Starknet 的 Gas 费。
-* **如果使用中继器**：用户只需在 OP 钱包签名，前端将签名发给中继器，中继器在 Starknet 上代付 Gas 提交。
+### M5 — Snapshot X（EVM / OP）可选后端
 
-### 2. AAStar 自研前端如何实现免 Gas？
+**目标**：为有链上金库/资产的社区提供链上治理选项，复用官方基础设施。
 
-你有两种选择：
+- [ ] 接入 `@snapshot-labs/sx` 的 EVM clients（优先 **Optimism**，其次 Base/Arbitrum/Ethereum）。
+- [ ] 读路径接 `apps/api`（`api.snapshot.box`）；**新增**而非替换链下 Hub。
+- [ ] 免 Gas：接入官方 Mana（`mana.snapshot.box`），或自建 `apps/mana`。
+- [ ] 给 `sx.js` signature client 提供最小 ethers 兼容 signer，底层走 KMS / 钱包；viem 保留在应用层。
+- [ ] 为 `VoteBackend` 提供 SX 实现，按空间类型自动路由。
 
-#### 方案 A：接入 Snapshot 官方的 Mana 节点（最省事）
+### M6 — 自助注册安全加固与多租户运维
 
-Snapshot 官方运行着一个公开的 Mana 节点（`https://mana.box`）。
-
-* **原理**：你的前端通过 `sx.js` 调用 Mana 的 API。
-* **费用**：目前 Snapshot Labs 允许第三方空间使用他们的 Mana。只要你在 Snapshot X 协议上创建了 Space，通常可以配置使用官方的赞助服务。
-* **绑定逻辑**：这确实是“前端绑定”，但在 `sx.js` 中只需一行配置，指向 Mana 的 API 地址。
-
-#### 方案 B：AAStar 自己运行 Mana 节点（最自主）
-
-作为开源组织，如果你希望拥有 100% 的控制权，不依赖 Snapshot 官方的服务器：
-
-* **操作**：克隆 [Mana Repo](https://www.google.com/search?q=https://github.com/snapshot-labs/mana)，自己部署一个中继器。
-* **费用**：AAStar 自己的 Starknet 钱包需要充值 STRK/ETH 作为 Gas 库。
-* **优势**：你可以结合你的 **SuperPaymaster** 研究，在 Mana 的基础上实现更复杂的赞助逻辑（比如：只给 AAStar 贡献者提供免 Gas 投票，或者根据用户的“信誉分”动态调整赞助优先级）。
-
----
-
-### 3. 给 AAStar 的详细 Action Plan
-
-既然你要从开发者角度切入，这里是具体的执行清单：
-
-#### **Step 1: 环境搭建与配置 (Week 1)**
-
-* **仓库地址**:
-* 前端 SDK: [`sx.js`](https://www.google.com/search?q=%5Bhttps://github.com/snapshot-labs/sx.js%5D(https://github.com/snapshot-labs/sx.js))
-* 中继器（可选）: [`mana`](https://www.google.com/search?q=%5Bhttps://github.com/snapshot-labs/mana%5D(https://github.com/snapshot-labs/mana))
-
-
-* **任务**:
-1. 在 Starknet 测试网部署一个 Space。
-2. 注册并获取官方 Mana 的授权（或配置本地 Mana）。
-
-
-
-#### **Step 2: 前端核心逻辑实现 (Week 2-3)**
-
-使用 `sx.js` 编写以下功能：
-
-1. **初始化 Client**:
-```typescript
-const client = new sx.Client({
-  manaUrl: 'https://mana.box', // 这里就是你问的“赞助商绑定”
-  starknetProvider: myProvider
-});
-
-```
-
-
-2. **创建提案/投票**: 调用 `propose` 或 `vote` 方法。SDK 会自动处理“签名 -> 发送给 Mana -> 链上确认”的全流程。
-3. **配置策略**: 编写 JSON 配置文件，使用 `evm-slot-value` 策略指向你的 OP 代币。
-
-#### **Step 3: 结合 PhD 研究的进阶开发 (Week 4+)**
-
-* **任务**: 既然你是 SuperPaymaster 的研究者，可以尝试在 AAStar 系统中引入 **“治理激励 Paymaster”**。
-* **动作**: 修改或扩展 Mana 的逻辑，使其能够识别用户的 ERC-4337 账户，并根据用户的链上声誉决定是否赞助这笔治理交易。
+- [ ] `POST /api/register` 加鉴权 + 按 IP 限流 + 验证码。
+- [ ] 验证 Snapshot 空间所有权（防止抢注他人 spaceId）。
+- [ ] 修 TOCTOU 竞态（`KV.get` 判重 → `KV.put`），改用原子写入或锁。
+- [ ] `_middleware.ts` 注入 `__TENANT__` 时转义 `<`。
+- [ ] `register.ts` 不再吞掉 CF Pages 域名注册失败；失败时回滚 KV 或返回可诊断错误。
+- [ ] 多租户运维文档（域名、KV、密钥）。
 
 ---
 
-### 核心组件总结表
+## 5. 技术选型原则
 
-| 组件 | AAStar 是否需要开发？ | 作用 |
-| --- | --- | --- |
-| **Space Contract** | 否（直接部署） | 存储在 Starknet 上的治理规则 |
-| **Storage Proof (Herodotus)** | 否（直接配置） | 证明用户在 OP 链有票 |
-| **sx.js SDK** | **是（深度集成）** | 前端与协议沟通的桥梁 |
-| **Mana (Relayer)** | **是（配置或部署）** | **Gas 的实际支付者** |
-| **Custom UI** | **是（核心工作）** | AAStar 的品牌展示与交互 |
-
-**下一步建议：**
-由于你已经是 PhD 候选人，建议你先通过 `sx.js` 的 [Example 代码](https://www.google.com/search?q=https://github.com/snapshot-labs/sx.js/tree/master/examples) 跑通一个简单的投票 Demo。**需要我为你提供一个简单的 `sx.js` 投票函数代码模版吗？**
-
-**你需要我帮你针对某个具体的 OP 链代币（比如 AAStar 可能发行的代币）写一段 `sx.js` 的初始化配置代码吗？**
-
-
-----
-
-官方ui有网址么？是一个demo还是实际应用？这个是使用sx.js开发的么
-
-关于 Snapshot X 官方 UI 的详情以及它与 `sx.js` 的关系，以下是开发视角下的详细说明：
-
-### 1. 官方 UI 网址与状态
-
-Snapshot X 的官方界面目前已经集成在 **Snapshot v2** 的统一平台中，它**既是实际应用也是标准参考**。
-
-* **访问地址**：**[snapshot.box](https://snapshot.box)**（注：原域名 snapshot.org 正在逐步迁移或并用）。
-* **如何识别 Snapshot X 空间**：在平台上，你会发现某些 Space 标记为 **"On-chain"** 或 **"Starknet"**，这些就是基于 Snapshot X 协议运行的。
-* **测试网 Demo**：如果你想在测试环境体验，通常使用的是 **[demo.snapshotx.xyz](https://www.google.com/search?q=https://demo.snapshotx.xyz)**（这是官方专门为 Snapshot X 早期展示和开发者准备的独立 UI 站点）。
-
-### 2. 技术栈：它是用 `sx.js` 开发的吗？
-
-**是的，完全正确。**
-
-官方 UI（无论是主站还是 Demo 站）都是基于 `sx.js` 构建的。Snapshot Labs 的架构非常清晰，采用了 **“协议 -> SDK -> UI”** 的分层模式：
-
-* **sx-starknet / sx-evm**: 底层智能合约。
-* **sx.js (SDK)**: **核心逻辑层**。它封装了所有复杂的密码学签名（EIP-712）、与 Starknet 合约的交互逻辑、以及与 Mana 中继器的通信。
-* **sx-ui (Vue.js)**: **表现层**。这是一个开源的单页应用（SPA），它通过调用 `sx.js` 来处理所有的治理动作。
-
-> **代码参考**：你可以在 GitHub 上的 [snapshot-labs/sx-ui](https://github.com/snapshot-labs/sx-ui)（或其 monorepo 中的 `apps/ui`）看到它是如何引入 `@snapshot-labs/sx`（即 sx.js）并调用 `client.vote()` 或 `client.propose()` 的。
+1. **协议互通优先**：能在官方前端看到的数据，才是可信数据。
+2. **免 Gas 优先**：链下签名是默认路径；链上仅在社区确有链上资产时启用。
+3. **基座跟随官方新版**：`sx.js` / `lock` / `tune` 优先于自研等价物。
+4. **白标与登录是差异化**：不为通用治理功能重造轮子，把精力放在多租户、AirAccount、中文体验。
+5. **不为未验证的未来重写现在**：用抽象层预留，不提前实现 SX。
 
 ---
 
-### 3. 给 AAStar 的开发建议：如何“站在巨人肩膀上”？
+## 6. 参考
 
-既然官方 UI 是开源的且使用了 `sx.js`，AAStar 的行动路线可以非常高效：
-
-1. **别从零造轮子**：直接参考 `sx-ui` 的源码。它已经处理好了最麻烦的部分，比如如何连接钱包、如何处理不同链的 Provider、如何展示 Herodotus 的证明状态。
-2. **UI 框架选择**：官方使用的是 **Vue 3**。如果 AAStar 团队熟悉 Vue，可以直接 Fork 或借鉴其组件逻辑；如果你们更倾向于 **React**，则只需引入 `sx.js`，业务逻辑是完全通用的。
-3. **赞助商（Sponsor）配置**：在代码中，你会发现一个 `manaUrl` 的配置项。
-* **官方前端**：默认指向官方运行的 Mana 节点。
-* **AAStar 前端**：你可以在你的前端代码里同样指向官方 Mana（如果你不想自己运维节点），或者指向 AAStar 自己部署的 Mana（如果你想实现自定义的赞助逻辑，比如结合你的 SuperPaymaster）。
-
-
-
-### 4. 总结 Action Plan（技术选型篇）
-
-* **Step A**: 访问 [demo.snapshotx.xyz](https://www.google.com/search?q=https://demo.snapshotx.xyz) 体验完整的“免 Gas”链上投票流程。
-* **Step B**: 克隆 [sx-monorepo](https://github.com/snapshot-labs/sx-monorepo)，重点研究 `packages/sx.js` 的 API 文档和 `apps/ui` 的调用方式。
-* **Step C**: 编写 AAStar 的“治理门户”原型。先用 `sx.js` 连接到官方的 Mana 测试环境，验证 OP 资产读取逻辑。
-
-**你想让我为你从 `sx-ui` 源码中找出一个核心的投票调用示例（Template）吗？这样你可以直接看到 UI 是如何触发免 Gas 流程的。**
-
------
-
-https://snapshot.box/#/explore，这个是使用sx的所有dao组织列表，如果我独立开发一个类似界面，看到的数据是可以互通的么？例如在我这里发布的dao组织，可以在官方explore看到？
-
-这是一个非常棒的问题，触及了 Web3 开发中**“协议层”**与**“应用层”**分离的核心。
-
-简单直接的回答是：**是的，数据完全互通。** 如果你在自己开发的界面发布了一个 DAO 组织（Space），它不但会出现在你的界面，也**会自动出现在 Snapshot 官方的 Explore 页面中**。
-
-### 1. 为什么数据可以互通？（技术底层）
-
-Snapshot X 的架构设计遵循了“数据在链，表现分离”的原则。
-
-* **链上事实**：当你创建一个 Space 或 Proposal 时，你是通过 `sx.js` 调用了部署在 Starknet 上的 **Proxy Factory** 或 **Space** 合约。这个动作是写在 Starknet 链上的“硬事实”。
-* **统一索引 (Indexer)**：Snapshot 官方运行着一个名为 [`sx-api`](https://www.google.com/search?q=%5Bhttps://github.com/snapshot-labs/sx-monorepo/tree/master/apps/api%5D(https://github.com/snapshot-labs/sx-monorepo/tree/master/apps/api)) 的开源多链索引器。它持续监听 Starknet 的链上事件（Event）。
-* **共享后端**：Snapshot 官方的 Explore 页面数据来源于这个索引器生成的 GraphQL 接口。由于你的 DAO 行为是链上透明的，官方索引器会自动抓取并将其展示在 `snapshot.box` 上。
-
----
-
-### 2. 互通的三个层次
-
-| 层次 | 互通内容 | 互通原理 |
-| --- | --- | --- |
-| **Space (组织)** | 你的 DAO 名字、设置、策略 | 来源于链上 Space 合约的 `metadata` 事件。 |
-| **Proposal (提案)** | 提案内容、起止时间 | 存储在 IPFS，其 Hash 记录在 Starknet 链上。 |
-| **Vote (投票)** | 谁投了票、权重多少 | 来源于链上 `Vote` 事件，所有前端都能查到。 |
-
----
-
-### 3. 注意事项：数据“同步”的细节
-
-虽然“协议层”是互通的，但在实际开发 AAStar 的前端时，有两点需要注意：
-
-1. **IPFS 依赖**：Snapshot X 通常将详细的描述文本存放在 IPFS。如果你在自己的前端发布提案，请确保将数据上传到了公共 IPFS 网关（或 Snapshot 官方也在用的网关），否则官方 UI 可能因为找不到 IPFS 文件而显示“加载中”。
-2. **API 选择**：
-* **快速开发**：你可以直接调用官方的 GraphQL 节点（例如 `https://api-snapshotx.snapshot.box/graphql`）。这样你的前端看到的数据和官方完全一致。
-* **完全独立**：如果 AAStar 想做“去中心化备份”，可以自己跑一个 `sx-api` 实例。即使官方关站，你的前端依然能通过自己的索引器看到所有 DAO 组织。
-
-
-
----
-
-### 4. 行动建议 (Action Plan)
-
-如果你想验证这种互通性：
-
-1. **小规模实验**：在 Starknet Goerli 测试网，用 `sx.js` 脚本部署一个测试 Space。
-2. **观察官方**：打开 [demo.snapshotx.xyz](https://www.google.com/search?q=https://demo.snapshotx.xyz)，搜索你刚刚部署的 Space 名字，你会发现它已经“自动”出现在列表里了。
-3. **AAStar 的机会**：你可以开发一个**更专注于特定垂直领域**（例如“开源贡献者治理”）的界面。用户在你的界面投票，结果会同步到官方，这大大增加了 AAStar 系统的可信度和兼容性。
-
-**既然你关注数据互通，需要我为你提供一个 GraphQL 查询模版吗？这样你可以直接从官方数据库里查询任意 DAO 的链上状态。**
+- 选型决策：[`docs/snapshot-version-decision.md`](./snapshot-version-decision.md)
+- 历史调研（含过时结论）：[`docs/SnapshotX.md`](./SnapshotX.md)
+- 多租户实现：[`docs/M2-multi-tenant.md`](./M2-multi-tenant.md)
+- 仓库架构评审：[`docs/architecture-review.md`](./architecture-review.md)
+- 开发循环与 pre-PR：[`docs/development-loop.md`](./development-loop.md)
+- Snapshot 官方文档：https://docs.snapshot.box
