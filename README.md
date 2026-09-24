@@ -120,6 +120,7 @@ Handy entry points:
 
 - [`docs/Plan.md`](./docs/Plan.md) — roadmap
 - [`docs/snapshot-version-decision.md`](./docs/snapshot-version-decision.md) — classic vs new stack
+- [`docs/snapshot-x-integration.md`](./docs/snapshot-x-integration.md) — Snapshot X (on-chain) integration guide
 - [`docs/deployment.md`](./docs/deployment.md) — environments, KV namespaces, secrets, runbook
 - [`docs/M2-multi-tenant.md`](./docs/M2-multi-tenant.md) — multi-tenancy
 - [`docs/architecture-review.md`](./docs/architecture-review.md) — tech-debt review
