@@ -72,6 +72,11 @@ Auth providers (pluggable via AuthProvider interface, auth/types.ts)
 Data / vote layer
   ├── lib/graphql.ts                    → Hub GraphQL queries + types (spaces/proposals/votes/scores)
   ├── lib/snapshotVote.ts               → hand-built EIP-712 vote envelope + hub/sequencer submit
+  ├── lib/voteBackend.ts                → off-chain vote-backend seam (VoteBackend)
+  ├── lib/sx/backend.ts                 → Snapshot X EVM backend (lazy import of @snapshot-labs/sx)
+  ├── lib/voteRouting.ts                → protocolForSpaceId: 0x… → SX, ENS → off-chain
+  ├── lib/errors.ts                     → coded errors + locale resolution
+  ├── lib/requestGuard.ts               → stale-response guard for loaders
   ├── lib/cache.ts                      → TTL in-memory cache (ExplorePage)
   └── config.ts                         → env-based endpoint config
 
