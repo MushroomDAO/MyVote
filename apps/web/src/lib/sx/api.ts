@@ -26,6 +26,12 @@ const SPACE_FIELDS =
 export const SX_SPACE_QUERY =
   'query Space($id: String!) { space(id: $id) { ' + SPACE_FIELDS + ' } }'
 
+export const SX_SPACES_QUERY =
+  'query Spaces($first: Int!, $skip: Int!) { ' +
+  'spaces(first: $first, skip: $skip, orderBy: created, orderDirection: desc) { ' +
+  SPACE_FIELDS +
+  ' } }'
+
 export const SX_PROPOSALS_QUERY =
   'query Proposals($space: String!, $first: Int!, $skip: Int!) { ' +
   'proposals(first: $first, skip: $skip, orderBy: created, orderDirection: desc, where: { space: $space }) { ' +
@@ -285,6 +291,20 @@ export async function fetchSxSpace(
     fetchImpl
   )
   return data.space ? toSxSpace(data.space) : null
+}
+
+export async function fetchSxSpaces(
+  endpoint: string = SX_API_DEFAULT,
+  options: { first?: number; skip?: number } = {},
+  fetchImpl: typeof fetch = fetch
+): Promise<SxSpace[]> {
+  const data = await sxGraphqlRequest<{ spaces: SxSpaceWire[] }>(
+    endpoint,
+    SX_SPACES_QUERY,
+    { first: options.first ?? 6, skip: options.skip ?? 0 },
+    fetchImpl
+  )
+  return (data.spaces ?? []).map(toSxSpace)
 }
 
 export async function fetchSxProposals(

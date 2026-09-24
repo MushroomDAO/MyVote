@@ -3,10 +3,12 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
-import { GRAPHQL_ENDPOINT } from '../config'
+import { GRAPHQL_ENDPOINT, SX_API_ENDPOINT } from '../config'
 import { fetchSpaces, type Space } from '../lib/graphql'
 import { cacheGet, cacheSet, cacheDelete, scopedCacheKey } from '../lib/cache'
 import { createRequestGuard } from '../lib/requestGuard'
+import { fetchSxSpaces, type SxSpace } from '../lib/sx/api'
+import { sxNetworkLabel } from '../lib/sx/backend'
 import { protocolForSpaceId } from '../lib/voteRouting'
 
 const { t } = useI18n()
@@ -22,6 +24,10 @@ const guard = createRequestGuard()
 // listing above. Let users open one directly by address.
 const sxAddress = ref('')
 const sxError = ref<string | null>(null)
+
+// Recently created on-chain spaces — the Hub listing only has ENS spaces.
+const sxSpaces = ref<SxSpace[]>([])
+const sxLoading = ref(false)
 
 const spaces = ref<Space[]>([])
 const loading = ref(false)
@@ -80,6 +86,18 @@ function refresh() {
   void loadSpaces(0, true)
 }
 
+/** Best-effort: a failure here must not take down the off-chain Explore list. */
+async function loadSxSpaces() {
+  sxLoading.value = true
+  try {
+    sxSpaces.value = await fetchSxSpaces(SX_API_ENDPOINT, { first: 6 })
+  } catch {
+    sxSpaces.value = []
+  } finally {
+    sxLoading.value = false
+  }
+}
+
 function openSxSpace() {
   const address = sxAddress.value.trim()
   if (protocolForSpaceId(address) !== 'snapshot-x') {
@@ -92,6 +110,7 @@ function openSxSpace() {
 
 onMounted(() => {
   void loadSpaces(0)
+  void loadSxSpaces()
 })
 </script>
 
@@ -146,6 +165,22 @@ onMounted(() => {
         </button>
       </div>
     </section>
+
+    <section class="card onchainCard">
+      <div class="cardHeader">
+        <span class="muted">{{ t('onchainSpaces') }}</span>
+      </div>
+      <div v-if="sxLoading" class="placeholder">{{ t('loading') }}</div>
+      <div v-else-if="sxSpaces.length === 0" class="placeholder">{{ t('empty') }}</div>
+      <ul v-else class="list">
+        <li v-for="sp in sxSpaces" :key="sp.id" class="item">
+          <div class="row">
+            <RouterLink class="name" :to="`/space/${sp.id}`">{{ sp.name ?? sp.id }}</RouterLink>
+            <span class="id">{{ sxNetworkLabel(sp.network) ?? '' }}</span>
+          </div>
+        </li>
+      </ul>
+    </section>
   </main>
 </template>
 
@@ -154,6 +189,10 @@ onMounted(() => {
   max-width: 960px;
   margin: 0 auto;
   padding: 24px;
+}
+
+.onchainCard {
+  margin-top: 16px;
 }
 
 .sxRow {
