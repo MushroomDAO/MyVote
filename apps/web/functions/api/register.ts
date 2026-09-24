@@ -31,6 +31,7 @@ type RegisterBody = {
 
 // Shared with the app (single tested source) — functions are bundled by esbuild,
 // so relative imports into src are fine as long as the modules stay browser-free.
+import { domainOutcome } from '../../src/lib/domainRegistration'
 import { isValidEmail } from '../../src/lib/email'
 import { hitRateLimit } from '../../src/lib/rateLimit'
 import { isValidSpaceId, isValidSubdomain } from '../../src/lib/registration'
@@ -131,23 +132,41 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return Response.json({ error: 'This name is already taken', domain }, { status: 409 })
   }
 
-  // --- Add custom domain to CF Pages project (triggers SSL cert issuance) ---
-  // Wildcard DNS *.forest.mushroom.cv is already configured; we only need the Pages domain
-  // registration to enable HTTPS for this specific subdomain.
-  if (token && accountId && pagesProject) {
-    const pagesResult = await cfApi(
-      token,
-      `/accounts/${accountId}/pages/projects/${pagesProject}/domains`,
-      'POST',
-      { name: domain }
+  // --- Register the custom domain on the Pages project (issues the SSL cert) ---
+  // The wildcard DNS record (*.<root>) already exists; only the per-domain Pages
+  // registration is needed to enable HTTPS for this subdomain.
+  const configured = Boolean(token && accountId && pagesProject)
+  const outcome = configured
+    ? domainOutcome(
+        true,
+        await cfApi(
+          token,
+          `/accounts/${accountId}/pages/projects/${pagesProject}/domains`,
+          'POST',
+          { name: domain }
+        )
+      )
+    : domainOutcome(false, null)
+
+  if (outcome.kind === 'rollback') {
+    // A KV entry whose domain never got registered looks "taken" but serves
+    // nothing. Undo the write and fail loudly so the user can retry the name.
+    await context.env.TENANTS_KV.delete(domain)
+    return Response.json(
+      {
+        error: 'Custom domain registration failed, please try again',
+        domain,
+        detail: outcome.detail,
+      },
+      { status: 502 }
     )
-    if (!pagesResult.success) {
-      // Log but don't fail — KV is written; admin can manually add the domain if needed
-      console.error('Pages domain registration failed:', JSON.stringify(pagesResult.errors))
-    }
-  } else {
-    console.warn('CF_API_TOKEN / CF_ACCOUNT_ID / CF_PAGES_PROJECT not set — skipping Pages domain registration')
   }
+
+  // Record whether the domain is actually wired up on this Pages project.
+  await context.env.TENANTS_KV.put(
+    domain,
+    JSON.stringify({ ...tenantConfig, domainStatus: outcome.kind })
+  )
 
   return Response.json({
     success: true,
@@ -155,5 +174,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     url: `https://${domain}`,
     spaceId,
     name,
+    domainStatus: outcome.kind,
   })
 }

@@ -17,7 +17,7 @@ cd apps/web && pnpm run build
 cd apps/web && pnpm run preview
 ```
 
-Tests run with **Vitest** (`pnpm run test`, happy-dom). Unit tests sit next to the code as `*.test.ts` (`auth/airAccountBridge.test.ts`, `lib/snapshotVote.test.ts`, `pages/SsoCallbackPage.test.ts`). There is no lint script; `pnpm run build` runs `vue-tsc -b` (typecheck) before bundling.
+Tests run with **Vitest** (`pnpm run test`, happy-dom). Unit tests sit next to the code as `*.test.ts` (`auth/`, `lib/`, `pages/`); **Cloudflare Functions are tested too** (`functions/**/*.test.ts`, run under Node via a per-file `@vitest-environment node` docblock). There is no lint script; `pnpm run build` runs `vue-tsc -b` (typecheck) before bundling.
 
 ```bash
 cd apps/web && pnpm run test       # Vitest
@@ -25,6 +25,7 @@ cd apps/web && pnpm run typecheck  # vue-tsc only
 ```
 
 > In a non-TTY shell `pnpm` may refuse to purge `node_modules`. Run the local binaries directly instead: `cd apps/web && ./node_modules/.bin/vitest run`.
+> `apps/web/pnpm-workspace.yaml` declares `allowBuilds: esbuild` so pnpm 11 does not fail on ignored build scripts.
 
 ## Pre-PR Check
 

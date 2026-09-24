@@ -33,5 +33,6 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     name: config.name,
     description: config.description,
     createdAt: config.createdAt,
+    domainStatus: config.domainStatus,
   })
 }
