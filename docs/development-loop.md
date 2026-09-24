@@ -68,3 +68,20 @@
 
 - 所有与 PR-Daemon 通信的仓库，提 PR 之前都要跑它自检并修掉 block（全仓库共享的机械规则，不是某个业务仓库自己的脚本）。
 - **改规则的流程**：判定变了就升版本号 → 写 CHANGELOG → 补自证格 → 跑 `scripts/pre_pr_replay.py` 回放看命中/误报。
+
+## CI（GitHub Actions）
+
+`.github/workflows/ci.yml` 在 **PR / push 到 `main` 或 `dev`** 时运行与本地一致的 gate
+（工作目录 `apps/web`）：
+
+```bash
+pnpm install --frozen-lockfile
+pnpm run typecheck   # vue-tsc -b
+pnpm run test        # vitest（含 functions/ 的 Node 环境用例）
+pnpm run build       # vite build
+```
+
+CI **只校验、不部署**；预览发布仍是显式步骤
+（`apps/web/scripts/deploy-preview.sh`，见 `docs/deployment.md`）。
+本地用 pnpm 脚本跑通即可，命令与 CI 完全一致。
+
