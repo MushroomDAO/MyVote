@@ -21,6 +21,10 @@ interface Env {
   CF_ROOT_DOMAIN: string
   /** Snapshot Hub used to look up a space's admins for the ownership proof. */
   SNAPSHOT_HUB?: string
+  /** When set, registration asks for the emailed verification code (M6-3). */
+  RESEND_API_KEY?: string
+  /** Salt for the stored code hash, kept in server config. */
+  EMAIL_CODE_SECRET?: string
 }
 
 type RegisterBody = {
@@ -29,6 +33,8 @@ type RegisterBody = {
   description?: string
   /** Registrant contact email (M4-B interim identity). Stored as contact only. */
   email?: string
+  /** Code sent to `email`; required when a mail service is configured. */
+  emailCode?: string
   /** Optional space-ownership proof: a personal_sign over the ownership message. */
   adminSignature?: string
   adminAddress?: string
@@ -40,6 +46,12 @@ type RegisterBody = {
 import { verifyMessage } from 'viem'
 
 import { domainOutcome } from '../../src/lib/domainRegistration'
+import {
+  EMAIL_CODE_TTL_SECONDS,
+  hashEmailCode,
+  verifyEmailCode,
+  type EmailCodeRecord
+} from '../../src/lib/emailCode'
 import { isValidEmail } from '../../src/lib/email'
 import {
   buildOwnershipMessage,
@@ -178,6 +190,42 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return Response.json({ error: 'email is invalid' }, { status: 400 })
   }
 
+  // --- Email verification (M6-3) ---
+  // Enforced when a mail service is configured: without one there is no code to
+  // check against, so the interim flow stays open and the record is marked
+  // unverified.
+  let emailVerified = false
+  if (context.env.RESEND_API_KEY) {
+    const stored = await context.env.TENANTS_KV.get(`ec:${email}`)
+    let record: EmailCodeRecord | null = null
+    try {
+      record = stored ? (JSON.parse(stored) as EmailCodeRecord) : null
+    } catch {
+      record = null
+    }
+    const submittedHash = body.emailCode
+      ? await hashEmailCode(email, body.emailCode, context.env.EMAIL_CODE_SECRET ?? '')
+      : ''
+    const verdict = verifyEmailCode(record, submittedHash, Math.floor(Date.now() / 1000))
+    if (!verdict.ok) {
+      // Count a wrong guess against the stored code to slow brute-forcing.
+      if (verdict.reason === 'mismatch' && record) {
+        try {
+          await context.env.TENANTS_KV.put(
+            `ec:${email}`,
+            JSON.stringify({ ...record, attempts: record.attempts + 1 }),
+            { expirationTtl: EMAIL_CODE_TTL_SECONDS }
+          )
+        } catch {
+          // Best effort: a failed counter bump does not change the verdict.
+        }
+      }
+      return Response.json({ error: `email_code_${verdict.reason}` }, { status: 400 })
+    }
+    emailVerified = true
+    await context.env.TENANTS_KV.delete(`ec:${email}`)
+  }
+
   const rootDomain = context.env.CF_ROOT_DOMAIN ?? 'forest.mushroom.cv'
   const domain = `${name}.${rootDomain}`
 
@@ -221,6 +269,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     contactEmail: email,
     // 'verified' | 'unverified' — see lib/ownership.ts.
     ownership,
+    // Set when a code was checked and accepted (M6-3).
+    emailVerified,
     createdAt: new Date().toISOString(),
     _reservation: reservation,
   }
