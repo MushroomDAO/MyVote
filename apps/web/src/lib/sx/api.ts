@@ -1,6 +1,7 @@
 import {
   SX_API_DEFAULT,
   type SxEvmNetworkId,
+  type SxProposalState,
   type SxStrategyConfig,
   type SxVoteRequest
 } from './types'
@@ -33,8 +34,8 @@ export const SX_SPACES_QUERY =
   ' } }'
 
 export const SX_PROPOSALS_QUERY =
-  'query Proposals($space: String!, $first: Int!, $skip: Int!) { ' +
-  'proposals(first: $first, skip: $skip, orderBy: created, orderDirection: desc, where: { space: $space }) { ' +
+  'query Proposals($space: String!, $first: Int!, $skip: Int!, $state: ProposalState) { ' +
+  'proposals(first: $first, skip: $skip, orderBy: created, orderDirection: desc, where: { space: $space, state: $state }) { ' +
   'id proposal_id metadata { title body choices } state snapshot start min_end max_end ' +
   'scores_total vote_count ' +
   STRATEGY_FIELDS +
@@ -316,12 +317,18 @@ export async function fetchSxSpaces(
 export async function fetchSxProposals(
   endpoint: string = SX_API_DEFAULT,
   spaceId: string,
-  options: { first?: number; skip?: number } & SxFetchOptions = {}
+  options: { first?: number; skip?: number; state?: SxProposalState } & SxFetchOptions = {}
 ): Promise<SxProposal[]> {
   const data = await sxGraphqlRequest<{ proposals: SxProposalWire[] }>(
     endpoint,
     SX_PROPOSALS_QUERY,
-    { space: spaceId, first: options.first ?? 20, skip: options.skip ?? 0 },
+    {
+      space: spaceId,
+      first: options.first ?? 20,
+      skip: options.skip ?? 0,
+      // An omitted variable makes the indexer skip the state predicate.
+      ...(options.state ? { state: options.state } : {})
+    },
     options
   )
   return (data.proposals ?? []).map(toSxProposal)

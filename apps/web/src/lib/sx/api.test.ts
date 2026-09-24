@@ -252,6 +252,31 @@ describe('fetchers', () => {
     expect(JSON.parse((fetchImpl.mock.lastCall![1] as RequestInit).body as string).query).toBe(SX_PROPOSAL_QUERY)
   })
 
+  it('passes an optional state filter to the proposals query', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ data: { proposals: [] } }))
+    await fetchSxProposals('https://api.example', SPACE_WIRE.id, {
+      first: 7,
+      skip: 0,
+      state: 'active',
+      fetchImpl: fetchImpl as unknown as typeof fetch
+    })
+    const body = JSON.parse((fetchImpl.mock.lastCall![1] as RequestInit).body as string)
+    expect(body.variables).toEqual({ space: SPACE_WIRE.id, first: 7, skip: 0, state: 'active' })
+    expect(body.query).toContain('$state: ProposalState')
+    expect(body.query).toContain('state: $state')
+  })
+
+  it('omits the state variable when no filter is set', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ data: { proposals: [] } }))
+    await fetchSxProposals('https://api.example', SPACE_WIRE.id, {
+      first: 7,
+      skip: 0,
+      fetchImpl: fetchImpl as unknown as typeof fetch
+    })
+    const body = JSON.parse((fetchImpl.mock.lastCall![1] as RequestInit).body as string)
+    expect(body.variables).toEqual({ space: SPACE_WIRE.id, first: 7, skip: 0 })
+  })
+
   it('defaults the endpoint to the official indexer', () => {
     expect(SX_API_DEFAULT).toBe('https://api.snapshot.box')
   })

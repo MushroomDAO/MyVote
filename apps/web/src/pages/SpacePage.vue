@@ -9,6 +9,7 @@ import { takePage } from '../lib/pageCursor'
 import { createRequestGuard } from '../lib/requestGuard'
 import { fetchSxProposals, fetchSxSpace, type SxProposal } from '../lib/sx/api'
 import { sxNetworkLabel } from '../lib/sx/backend'
+import type { SxProposalState } from '../lib/sx/types'
 import { protocolForSpaceId } from '../lib/voteRouting'
 
 const { t, locale } = useI18n()
@@ -19,6 +20,14 @@ const PAGE_SIZE = 20
 const guard = createRequestGuard()
 
 const spaceId = computed(() => String(route.params.id ?? ''))
+
+// Proposal state filter ('all' sends no predicate; both backends accept one).
+const stateFilter = ref<'all' | SxProposalState>('all')
+const stateOptions: { value: 'all' | SxProposalState; label: string }[] = [
+  { value: 'all', label: 'filterAll' },
+  { value: 'active', label: 'filterActive' },
+  { value: 'closed', label: 'filterClosed' }
+]
 
 const space = ref<Space | null>(null)
 const proposals = ref<ProposalListItem[]>([])
@@ -66,12 +75,13 @@ async function loadSpace(skip: number) {
   const signal = guard.signal
   const sx = protocolForSpaceId(spaceId.value) === 'snapshot-x'
   isSx.value = sx
+  const state = stateFilter.value === 'all' ? undefined : stateFilter.value
   try {
     if (sx) {
       // On-chain space: read from the SX indexer instead of the off-chain Hub.
       const [sxSpace, page] = await Promise.all([
         fetchSxSpace(SX_API_ENDPOINT, spaceId.value, { signal }),
-        fetchSxProposals(SX_API_ENDPOINT, spaceId.value, { first: PAGE_SIZE + 1, skip, signal })
+        fetchSxProposals(SX_API_ENDPOINT, spaceId.value, { first: PAGE_SIZE + 1, skip, signal, state })
       ])
       if (!guard.isCurrent(token)) return
 
@@ -91,7 +101,8 @@ async function loadSpace(skip: number) {
       spaceId: spaceId.value,
       first: PAGE_SIZE + 1,
       skip,
-      signal
+      signal,
+      state
     })
     if (!guard.isCurrent(token)) return
 
@@ -134,6 +145,11 @@ function proposalLink(p: ProposalListItem) {
 }
 
 watch(spaceId, () => {
+  stateFilter.value = 'all'
+  void loadSpace(0)
+})
+
+watch(stateFilter, () => {
   void loadSpace(0)
 })
 
@@ -187,6 +203,18 @@ onUnmounted(() => {
       </div>
 
       <div class="sectionTitle">{{ t('proposals') }}</div>
+      <div class="filters">
+        <button
+          v-for="option in stateOptions"
+          :key="option.value"
+          type="button"
+          class="filterBtn"
+          :class="{ isActive: stateFilter === option.value }"
+          @click="stateFilter = option.value"
+        >
+          {{ t(option.label) }}
+        </button>
+      </div>
       <div v-if="proposals.length === 0" class="muted">{{ t('empty') }}</div>
       <ul v-else class="list">
         <li v-for="p in proposals" :key="p.id" class="item">
@@ -294,6 +322,28 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.filterBtn {
+  border: 1px solid var(--mv-border-md);
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.filterBtn.isActive {
+  background: var(--mv-selected-bg);
+  border-color: var(--mv-primary);
+  font-weight: 600;
 }
 
 .retryBtn {

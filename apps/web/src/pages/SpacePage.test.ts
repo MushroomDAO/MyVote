@@ -46,7 +46,10 @@ const i18n = createI18n({
       loadMore: 'Load more',
       sxOnchain: 'ONCHAIN',
       network: 'Network',
-      retry: 'Retry'
+      retry: 'Retry',
+      filterAll: 'ALL',
+      filterActive: 'ACTIVE',
+      filterClosed: 'CLOSED'
     }
   }
 })
@@ -245,6 +248,67 @@ describe('SpacePage pagination lookahead', () => {
 
     expect(wrapper.findAll('.item')).toHaveLength(20)
     expect(wrapper.find('.moreBtn').exists()).toBe(true)
+  })
+})
+
+describe('SpacePage proposal state filter', () => {
+  it('sends no state predicate by default', async () => {
+    fetchSpaceWithProposals.mockResolvedValueOnce(spaceResult('space-a', 'A'))
+    route.params.id = 'space-a'
+    mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    const params = fetchSpaceWithProposals.mock.calls[0]![1] as { state?: string }
+    expect(params.state).toBeUndefined()
+  })
+
+  it('renders the three filters and refetches with the selected state', async () => {
+    fetchSpaceWithProposals.mockResolvedValue(spaceResult('space-a', 'A'))
+    route.params.id = 'space-a'
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    const buttons = wrapper.findAll('.filterBtn')
+    expect(buttons.map((b) => b.text())).toEqual(['ALL', 'ACTIVE', 'CLOSED'])
+    expect(buttons[0]!.classes()).toContain('isActive')
+
+    await buttons[1]!.trigger('click')
+    await flushPromises()
+
+    const last = fetchSpaceWithProposals.mock.lastCall![1] as { state?: string; skip: number }
+    expect(last.state).toBe('active')
+    expect(last.skip).toBe(0)
+  })
+
+  it('forwards the filter to the SX read as well', async () => {
+    const SX_A = '0x1111111111111111111111111111111111111111'
+    fetchSxSpace.mockResolvedValue(sxSpace(SX_A, 'SX A'))
+    fetchSxProposals.mockResolvedValue([])
+    route.params.id = SX_A
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    await wrapper.findAll('.filterBtn')[2]!.trigger('click')
+    await flushPromises()
+
+    const options = fetchSxProposals.mock.lastCall![2] as { state?: string }
+    expect(options.state).toBe('closed')
+  })
+
+  it('resets the filter when navigating to another space', async () => {
+    fetchSpaceWithProposals.mockResolvedValue(spaceResult('space-a', 'A'))
+    route.params.id = 'space-a'
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    await wrapper.findAll('.filterBtn')[2]!.trigger('click')
+    await flushPromises()
+    expect((fetchSpaceWithProposals.mock.lastCall![1] as { state?: string }).state).toBe('closed')
+
+    route.params.id = 'space-b'
+    await nextTick()
+    await flushPromises()
+    expect((fetchSpaceWithProposals.mock.lastCall![1] as { state?: string }).state).toBeUndefined()
   })
 })
 
