@@ -2,8 +2,6 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
 
 import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME, SX_API_ENDPOINT } from '../config'
 import { useAuth } from '../auth/useAuth'
@@ -17,6 +15,7 @@ import {
   type ProposalType,
   type VoterVote
 } from '../lib/graphql'
+import { renderMarkdown } from '../lib/markdown'
 import { createRequestGuard } from '../lib/requestGuard'
 import { type VoteChoice } from '../lib/snapshotVote'
 import { createEthersCompatSigner, sxTxUrl } from '../lib/sx/backend'
@@ -171,7 +170,7 @@ function shortAddress(address: string) {
 const renderedBody = computed(() => {
   const body = proposal.value?.body
   if (!body) return ''
-  return DOMPurify.sanitize(marked(body) as string)
+  return renderMarkdown(body)
 })
 
 const voteResults = computed(() => {
