@@ -258,10 +258,14 @@ export async function sxGraphqlRequest<T>(
   }
 
   const { data, errors } = payload as { data?: unknown; errors?: { message: string }[] }
-  if (errors?.length) {
+
+  // The indexer returns *partial* data alongside per-entry errors when a single
+  // row is unreadable (observed: a space whose metadata is null). Only fail when
+  // there is no usable data at all; otherwise let callers map what came back.
+  if (errors?.length && (data === undefined || data === null)) {
     throw new Error('SX indexer: ' + errors.map((e) => e.message).join('; '))
   }
-  if (data === undefined) throw new Error('SX indexer returned no data')
+  if (data === undefined || data === null) throw new Error('SX indexer returned no data')
   return data as T
 }
 

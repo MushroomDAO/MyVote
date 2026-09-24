@@ -26,6 +26,7 @@ cd apps/web && pnpm run typecheck  # vue-tsc only
 
 > In a non-TTY shell `pnpm` may refuse to purge `node_modules`. Run the local binaries directly instead: `cd apps/web && ./node_modules/.bin/vitest run`.
 > `apps/web/pnpm-workspace.yaml` declares `allowBuilds: esbuild` so pnpm 11 does not fail on ignored build scripts.
+> Opt-in live check against the real Snapshot X indexer: `SX_LIVE=1 ./node_modules/.bin/vitest run src/lib/sx/api.test.ts`.
 
 ## Pre-PR Check
 
