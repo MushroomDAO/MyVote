@@ -150,6 +150,13 @@
 - [x] 两端「已投票」识别：链上禁用重复投票 + 交易链接 + 权重（#57、#58），
       链下提示 + 预选可改（#59）。
 - [x] Explore 链上空间列表分页（`SX_PAGE_SIZE=6` + lookahead）（#54）。
+- [x] SX 不可投即禁用并说明原因：`sxBlockReason`（closed / not-started /
+      no-authenticator）接进 `canVote`，并显示对应翻译（#63）。
+- [x] SX 已投票提示显示所投选项（`choice` → `choices[choice-1]`）（#62）；
+      投票窗口到点自动翻转提交按钮（`lib/sx/voteWindow.ts` 定时器）（#65）。
+- [x] Explore 链上空间列表 5 分钟缓存（与链下一致，refresh/retry 强制绕过）（#64）。
+- [x] i18n catalog 键集完全一致校验 + 筛选空结果专门文案（#66）。
+- [x] SpacePage 切筛选只重载列表，卡片与筛选按钮不闪没（#67）。
 - [ ] 真实 SX 投票 E2E 与注册鉴权仍按 M5 / M6 的阻塞项处理。
 
 ---
