@@ -68,11 +68,15 @@
 
 **目标**：为有链上金库/资产的社区提供链上治理选项，复用官方基础设施。
 
-- [ ] 接入 `@snapshot-labs/sx` 的 EVM clients（优先 **Optimism**，其次 Base/Arbitrum/Ethereum）。
-- [ ] 读路径接 `apps/api`（`api.snapshot.box`）；**新增**而非替换链下 Hub。
-- [ ] 免 Gas：接入官方 Mana（`mana.snapshot.box`），或自建 `apps/mana`。
-- [ ] 给 `sx.js` signature client 提供最小 ethers 兼容 signer，底层走 KMS / 钱包；viem 保留在应用层。
-- [ ] 为 `VoteBackend` 提供 SX 实现，按空间类型自动路由。
+- [x] **M5-1 后端模块**：新增 `@snapshot-labs/sx` 依赖 + `lib/sx/backend.ts`
+      （封装 EVM `EvmEthereumSig`、官方 Mana / whitelist 默认值、动态 import 代码分割）
+- [x] **M5-1 signer 适配**：`createEthersCompatSigner` 把 viem 形状的 `signTypedData`
+      桥接为 ethers v5 的 `_signTypedData`；viem 保留在应用层
+- [x] **M5-1 路由启发式**：`lib/voteRouting.ts` `protocolForSpaceId`（`0x…` → SX，ENS → 链下）
+- [ ] **M5-2 接线**：ProposalPage / 新页面按 `protocolForSpaceId` 选择后端；
+      需先决定 ethers `Provider` 来源（新增 `@ethersproject/providers`，或包装 EIP-1193）
+- [ ] 读路径接 `apps/api`（`api.snapshot.box`）；**新增**而非替换链下 Hub
+- [ ] 在一个真实 SX space（优先 Optimism）上做端到端验证
 
 ### M6 — 自助注册安全加固与多租户运维
 
