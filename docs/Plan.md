@@ -100,7 +100,10 @@
       _彻底修复需 Durable Objects（KV 无 CAS）——记为残余风险。_
 - [ ] **鉴权 / 验证码**：注册者身份目前仅前端声明的邮箱，服务端不可信。需产品决策
       （邮箱验证码 / cos72 登录态 / 钱包对注册请求签名）。
-- [ ] **Snapshot 空间所有权校验**：防止抢注他人 spaceId。需产品决策（签名消息 / space 设置校验串）。
+- [x] **Snapshot 空间所有权校验**（非破坏式）：可选 `adminSignature`/`adminAddress`/`adminTimestamp`；
+      `viem.verifyMessage` 验签 + 向 Hub 查 `space.admins`。**提供签名则必须通过**（否则 400），
+      不提供则记为 `unverified`（现有邮箱注册流程不变）。见 `lib/ownership.ts`。
+      _后续可按策略收紧（例如要求 `verified` 才实际发放域名/证书）。_
 - [x] **预览/生产 KV 隔离**：新增 `wrangler.preview.toml` + `scripts/deploy-preview.sh`，
       修复 `wrangler pages deploy` 把预览绑定覆盖成生产命名空间的问题（见 `docs/deployment.md` §2）。
 - [x] **多租户运维文档**：`docs/deployment.md`（环境、KV、密钥、部署命令、健康检查、排障）。
