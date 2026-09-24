@@ -1,0 +1,19 @@
+# Preview/branch deploys MUST use the preview KV namespace.
+#
+# `wrangler pages deploy` mirrors the KV bindings declared here onto the Pages
+# project for the deployment, using `id`. The Pages project's dashboard preview
+# binding is therefore overwritten on every CLI deploy — so this file exists to
+# point branch deploys at MYVOTE_TENANTS_KV_PREVIEW and keep preview writes out
+# of production data.
+name = "myvote"
+compatibility_date = "2024-01-01"
+
+pages_build_output_dir = "dist"
+
+[[kv_namespaces]]
+binding = "TENANTS_KV"
+id = "34c1c5f2e50243d1992af2f547151140"
+
+[vars]
+CF_ROOT_DOMAIN = "forest.mushroom.cv"
+SNAPSHOT_HUB = "https://testnet.hub.snapshot.org"
