@@ -153,6 +153,23 @@ describe('sxGraphqlRequest', () => {
     ).rejects.toThrow(/boom/)
   })
 
+  it('tolerates partial data returned alongside per-row errors', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse({
+        data: { spaces: [{ id: 'a' }] },
+        errors: [{ message: 'row 7 metadata is null' }]
+      })
+    )
+
+    const data = await sxGraphqlRequest<{ spaces: unknown[] }>(
+      'https://api.example',
+      'q',
+      {},
+      fetchImpl as unknown as typeof fetch
+    )
+    expect(data.spaces).toHaveLength(1)
+  })
+
   it('surfaces a non-JSON response', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response('<html>', { status: 502 }))
     await expect(
