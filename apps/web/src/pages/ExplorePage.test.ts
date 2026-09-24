@@ -16,11 +16,16 @@ vi.mock('../lib/sx/api', () => ({
   fetchSxSpaces: (...args: unknown[]) => fetchSxSpaces(...args)
 }))
 
-// Keep the cache a no-op so tests do not share state.
+// A small in-memory cache so the cache paths are exercised; cleared per test.
+const cacheState = vi.hoisted(() => ({ store: new Map<string, unknown>() }))
 vi.mock('../lib/cache', () => ({
-  cacheGet: () => null,
-  cacheSet: () => {},
-  cacheDelete: () => {},
+  cacheGet: (key: string) => cacheState.store.get(key) ?? null,
+  cacheSet: (key: string, value: unknown) => {
+    cacheState.store.set(key, value)
+  },
+  cacheDelete: (key: string) => {
+    cacheState.store.delete(key)
+  },
   scopedCacheKey: (namespace: string) => namespace
 }))
 
@@ -65,6 +70,60 @@ async function mountExplore() {
 
 afterEach(() => {
   vi.resetAllMocks()
+  cacheState.store.clear()
+})
+
+describe('ExplorePage on-chain cache', () => {
+  it('serves the on-chain list from cache on a second mount', async () => {
+    fetchSpaces.mockResolvedValue({ spaces: [] })
+    fetchSxSpaces.mockResolvedValue([{ id: SX, name: 'Cached Space', network: 'optimism' }])
+
+    const first = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+    expect(fetchSxSpaces).toHaveBeenCalledTimes(1)
+    first.unmount()
+
+    const second = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    // Served from cache: no second indexer call, and the note says so.
+    expect(fetchSxSpaces).toHaveBeenCalledTimes(1)
+    expect(second.get('.onchainCard').text()).toContain('Cached Space')
+    expect(second.get('.onchainCard').text()).toContain('cached')
+  })
+
+  it('retry always goes to the network, even with a cache present', async () => {
+    fetchSpaces.mockResolvedValue({ spaces: [] })
+    fetchSxSpaces.mockRejectedValueOnce(new Error('down'))
+    const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+    expect(wrapper.get('.onchainCard').text()).toContain('SX_ERROR')
+
+    // A stale entry appears while the failure is showing.
+    cacheState.store.set('explore:sx-spaces', [{ id: SX, name: 'Stale', network: 'optimism' }])
+    fetchSxSpaces.mockResolvedValue([{ id: SX, name: 'Fresh', network: 'optimism' }])
+
+    await wrapper.get('.onchainCard .retryBtn').trigger('click')
+    await flushPromises()
+
+    expect(fetchSxSpaces).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('.onchainCard').text()).toContain('Fresh')
+    expect(wrapper.get('.onchainCard').text()).not.toContain('Stale')
+  })
+
+  it('refresh bypasses the on-chain cache', async () => {
+    fetchSpaces.mockResolvedValue({ spaces: [] })
+    fetchSxSpaces.mockResolvedValue([])
+
+    const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+    expect(fetchSxSpaces).toHaveBeenCalledTimes(1)
+
+    await wrapper.find('.refreshBtn').trigger('click')
+    await flushPromises()
+
+    expect(fetchSxSpaces).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('ExplorePage pagination lookahead', () => {
