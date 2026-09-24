@@ -34,6 +34,7 @@ A white-label governance portal for any community. **Classic Snapshot (off-chain
 | M3 Multi-backend write path, race guard, cache scoping, error i18n | ✅ |
 | M4 AirAccount login | ⏸ blocked on E-5 KMS + cos72 (interim email login shipped) |
 | M5 Snapshot X (EVM/OP): backend, read path, pages, results | ✅ (live vote pending a space with voting power) |
+| M5.5 Sepolia testnet community E2E: ENSv2 name → space → proposal → real votes | ✅ |
 | M6 Registration hardening + space ownership + ops runbook | ✅ (captcha/identity pending an email service) |
 
 Full roadmap: [`docs/Plan.md`](./docs/Plan.md).
@@ -121,6 +122,7 @@ Handy entry points:
 - [`docs/Plan.md`](./docs/Plan.md) — roadmap
 - [`docs/snapshot-version-decision.md`](./docs/snapshot-version-decision.md) — classic vs new stack
 - [`docs/snapshot-x-integration.md`](./docs/snapshot-x-integration.md) — Snapshot X (on-chain) integration guide
+- [`docs/testnet-space-e2e.md`](./docs/testnet-space-e2e.md) — Sepolia testnet space end-to-end (ENSv2 quirks, reproducible steps)
 - [`docs/deployment.md`](./docs/deployment.md) — environments, KV namespaces, secrets, runbook
 - [`docs/M1-clone-deploy.md`](./docs/M1-clone-deploy.md) — clone & deploy for a new community
 - [`docs/M2-multi-tenant.md`](./docs/M2-multi-tenant.md) — multi-tenancy
