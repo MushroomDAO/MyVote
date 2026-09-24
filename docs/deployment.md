@@ -92,6 +92,10 @@ npx -y wrangler@4 pages dev dist --port 8799 --ip 127.0.0.1 \
 本地没有 `CF_API_TOKEN`，成功响应里 `domainStatus` 为 `unmanaged`。
 （2026-09-24 实测：`hello@idoris.ai` 真实发出、收到 6 位码、错误码 400 `email_code_mismatch`、正确码 200。）
 
+**「本地能发、线上发不了」是两回事（常见疑问）**：上一次成功的发送发生在**本地** `wrangler pages dev`，
+密钥是我用 `-b RESEND_API_KEY=…` 从 `~/Dev/.env`（那把 key 早就有）注入到**本地进程**的。
+部署在 Cloudflare 上的预览/生产项目**没有配置这个变量**，所以线上 `/api/email-code` 返回 503
+`email_verification_unavailable`（注册保持开放）。缺的不是 key，而是「在 CF 项目上配置它」这一步。
 > ⚠️ **密钥作用域**：`wrangler pages secret put` 写的是 **production** 作用域——一旦设置，
 > 生产注册就会强制要求验证码。只想在 **preview** 开启，必须在 CF 控制台 → Pages 项目 →
 > Settings → Variables and Secrets 的 **Preview** 环境里单独设置；CLI 没有 preview 作用域选项。
