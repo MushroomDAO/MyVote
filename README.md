@@ -32,10 +32,10 @@ A white-label governance portal for any community. **Classic Snapshot (off-chain
 | M1 Clone & Deploy (branding, pages, off-chain voting, i18n) | ✅ |
 | M2 Multi-tenant (KV + edge injection + self-service registration) | ✅ |
 | M3 Multi-backend write path, race guard, cache scoping, error i18n | ✅ |
-| M4 AirAccount login | ⏸ blocked on E-5 KMS + cos72 (interim email login shipped) |
+| M4 AirAccount login | ⏸ MyVote side done (KMS signer + verified live signature); waiting on cos72 credentials — see `docs/cos72-airaccount-requirements.md` |
 | M5 Snapshot X (EVM/OP): backend, read path, pages, results | ✅ (real Sepolia testnet vote cast 2026-09-24; public Mana has no Sepolia gas) |
 | M5.5 Sepolia testnet community E2E: ENSv2 name → space → proposal → real votes | ✅ |
-| M6 Registration hardening + space ownership + ops runbook | ✅ (captcha/identity pending an email service) |
+| M6 Registration hardening: rate limit, ownership proof, email code, atomic name claim (DO) | ✅ |
 
 Full roadmap: [`docs/Plan.md`](./docs/Plan.md).
 
