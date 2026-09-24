@@ -16,7 +16,9 @@
 | Proposal body Markdown 渲染 | ✅ 完成 |
 | 多语言（zh-CN 默认 / English） | ✅ 完成 |
 | 钱包连接（MetaMask 等注入钱包） | ✅ 完成 |
-| AirAccount Web2 登录 | 🔲 接口占位，实现在后续版本 |
+| 邮箱登录（临时 Web2 登录） | ✅ 完成 |
+| AirAccount Web2 登录（cos72 SSO + KMS） | 🟡 管道已通；E-5 KMS 与 cos72 落地页未交付 |
+| Snapshot X（链上，EVM/OP）可选后端 | ✅ 读 / 投 / 结果 / 投票预检已就绪 |
 | 品牌配置（单文件定制） | ✅ 完成 |
 | CSS 变量主题系统 | ✅ 完成 |
 | 部署配置（Vercel/Netlify/CF Pages） | ✅ 完成 |
@@ -126,12 +128,21 @@ pnpm run build
 - 在你的界面发布的投票，在 snapshot.org 也可见
 - 免 Gas：投票仅需 EIP-712 签名，无需支付链上 Gas
 
-后续 M3 将迁移到 **Snapshot X**（基于 Starknet 的链上投票）。
+### 可选的链上后端（Snapshot X）
+
+`0x…` 形式的 space 会自动走 [Snapshot X](https://docs.snapshot.box/snapshot-x/overview)（EVM，含 **Optimism**）：
+从 `api.snapshot.box` 读取，经 Mana 免 Gas 中继投票；ENS 空间仍走上面的链下 Hub。
+二者**共存**、按 space 路由（见 `apps/web/src/lib/voteRouting.ts`）。
+
+在 Explore 页可用「打开链上空间」按地址进入，或直接看「链上空间（Snapshot X）」列表
+（例：Optimism 上的 Ryu0x167 Space Command `0x03C7431e14F7b759Aa44398AD7901e6053c197Bf`）。
 
 ---
 
 ## 已知限制
 
-- AirAccount (Web2 登录) 为接口占位，实现在后续版本
-- 提案创建 UI 未实现（可通过 snapshot.org 官网创建）
+- AirAccount 真实登录仍阻塞于外部（E-5 KMS 签名端点、cos72 SSO 落地页）；当前提供**邮箱登录**作为临时替代
+- Snapshot X 的**真实投票**尚待一个持有投票权的 space 做端到端验证（只读、结果、投票预检、payload 构造已在真实 Optimism space 上验证）
+- 注册的身份校验目前是**可选**的空间所有权签名（不提供也可注册，记为 `unverified`）；验证码 / 强身份待接入邮箱服务
+- 提案创建 UI 未实现（可通过 snapshot.org / snapshot.box 创建）
 - Space 管理 UI 未实现
