@@ -82,6 +82,25 @@ describe('query wrappers', () => {
     expect(body.variables).toEqual({ spaceId: 'a.eth', first: 20, skip: 40 })
   })
 
+  it('passes an optional state filter and omits it when absent', async () => {
+    const withState = stubFetch({ data: { space: null, proposals: [] } })
+    await fetchSpaceWithProposals('https://hub.test/graphql', {
+      spaceId: 'a.eth',
+      first: 21,
+      skip: 0,
+      state: 'active'
+    })
+    let body = JSON.parse((withState.mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.variables).toEqual({ spaceId: 'a.eth', first: 21, skip: 0, state: 'active' })
+    expect(body.query).toContain('$state: String')
+    expect(body.query).toContain('state: $state')
+
+    const without = stubFetch({ data: { space: null, proposals: [] } })
+    await fetchSpaceWithProposals('https://hub.test/graphql', { spaceId: 'a.eth', first: 21, skip: 0 })
+    body = JSON.parse((without.mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.variables).toEqual({ spaceId: 'a.eth', first: 21, skip: 0 })
+  })
+
   it('fetchProposal returns the proposal', async () => {
     stubFetch({ data: { proposal: { id: '0x1', title: 'T' } } })
     await expect(

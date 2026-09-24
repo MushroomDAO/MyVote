@@ -8,5 +8,8 @@
 export type { SxStrategyConfig, SxVoteRequest, SxVoteBackend, SxEvmNetworkId } from './backend'
 export { SX_EVM_CHAIN_IDS, SX_MANA_URL, SX_WHITELIST_URL } from './backend'
 
+/** Proposal state as the indexer's `ProposalState` enum exposes it. */
+export type SxProposalState = 'pending' | 'active' | 'closed'
+
 /** Official Snapshot X multi-chain indexer (Checkpoint-based GraphQL). */
 export const SX_API_DEFAULT = 'https://api.snapshot.box'

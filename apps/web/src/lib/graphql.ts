@@ -99,13 +99,20 @@ export async function fetchSpaces(
 
 export async function fetchSpaceWithProposals(
   endpoint: string,
-  params: { spaceId: string; first: number; skip: number; signal?: AbortSignal }
+  params: {
+    spaceId: string
+    first: number
+    skip: number
+    /** Optional proposal state filter; omitted means no filter. */
+    state?: string
+    signal?: AbortSignal
+  }
 ) {
   const { signal, ...variables } = params
   return graphqlRequest<{ space: Space | null; proposals: ProposalListItem[] }>(
     endpoint,
     `
-      query SpacePage($spaceId: String!, $first: Int!, $skip: Int!) {
+      query SpacePage($spaceId: String!, $first: Int!, $skip: Int!, $state: String) {
         space(id: $spaceId) {
           id
           name
@@ -116,7 +123,7 @@ export async function fetchSpaceWithProposals(
         proposals(
           first: $first
           skip: $skip
-          where: { space_in: [$spaceId] }
+          where: { space_in: [$spaceId], state: $state }
           orderBy: "created"
           orderDirection: desc
         ) {
