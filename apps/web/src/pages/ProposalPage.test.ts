@@ -87,6 +87,8 @@ const i18n = createI18n({
       errVoteClockSkew: 'CLOCK_SKEW:{detail}',
       errVoteRejected: 'HUB_REJECTED:{status}:{detail}',
       errSxVoteClosed: 'SX_VOTE_CLOSED',
+      errSxVoteNotStarted: 'SX_VOTE_NOT_STARTED',
+      errSxNoAuthenticator: 'SX_NO_AUTHENTICATOR',
       voteError: 'Vote failed',
       submitVote: 'Submit vote',
       voteChoice: 'Choose an option',
@@ -444,8 +446,39 @@ describe('ProposalPage Snapshot X', () => {
 
     const wrapper = await mountAndVote()
 
+    // The local pre-flight disables the button and names the reason.
+    expect(wrapper.get('.submit').attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('SX_VOTE_CLOSED')
     expect(sxCastVote).not.toHaveBeenCalled()
+  })
+
+  it('disables submit before the on-chain window opens', async () => {
+    routeState.params = { id: '12' }
+    routeState.query = { space: SX_SPACE }
+    // Starts far in the future; indexed state still reports active.
+    fetchSxProposal.mockResolvedValue({ ...sxProposal(), state: 'active', start: 4102444800 })
+
+    const wrapper = mount(ProposalPage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.get('.submit').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('SX_VOTE_NOT_STARTED')
+  })
+
+  it('disables submit when the space has no authenticator', async () => {
+    routeState.params = { id: '12' }
+    routeState.query = { space: SX_SPACE }
+    const base = sxProposal()
+    fetchSxProposal.mockResolvedValue({
+      ...base,
+      space: { ...base.space, authenticators: [] }
+    })
+
+    const wrapper = mount(ProposalPage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.get('.submit').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('SX_NO_AUTHENTICATOR')
   })
 
   it('reports a missing wallet instead of attempting an on-chain vote', async () => {

@@ -9,7 +9,7 @@ import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME, SX_API_ENDPOINT } from '../config'
 import { useAuth } from '../auth/useAuth'
 import { EmailSigningUnsupportedError } from '../auth/emailProvider'
 import { KmsNotConfiguredError } from '../auth/kms'
-import { AppError, resolveErrorMessage, type ErrorCode } from '../lib/errors'
+import { AppError, errorKey, resolveErrorMessage, type ErrorCode } from '../lib/errors'
 import {
   fetchProposal,
   fetchVoterVote,
@@ -56,14 +56,34 @@ const existingSxVote = ref<SxVote | null>(null)
 const sxVoted = ref(false)
 /** The account's current off-chain vote, so the ballot can show/prefill it. */
 const existingOffchainVote = ref<VoterVote | null>(null)
-/** SX proposals keep their indexed state; use it to disable an impossible vote. */
-const sxClosed = computed(() => sxProposal.value?.state.toLowerCase() === 'closed')
+/** Local pre-flight reason an SX vote cannot go through right now. */
+const sxBlockReason = computed<SxVoteBlock | null>(() => {
+  const sx = sxProposal.value
+  if (!sx) return null
+  return sxVoteBlock(
+    {
+      state: sx.state,
+      start: sx.start,
+      maxEnd: sx.maxEnd,
+      hasAuthenticator: (sx.space?.authenticators.length ?? 0) > 0
+    },
+    Math.floor(Date.now() / 1000)
+  )
+})
 
 const SX_BLOCK_CODES: Record<SxVoteBlock, ErrorCode> = {
   closed: 'sxVoteClosed',
   'not-started': 'sxVoteNotStarted',
   'no-authenticator': 'sxNoAuthenticator'
 }
+
+/** Localized reason shown with the disabled submit button when blocked. */
+const sxBlockText = computed(() => {
+  const block = sxBlockReason.value
+  if (!block) return null
+  const key = errorKey(SX_BLOCK_CODES[block])
+  return key ? t(key) : null
+})
 
 /**
  * Off-chain Hub proposals are votable only while `active`. Kept conservative:
@@ -88,7 +108,7 @@ const existingSxChoice = computed(() => {
 /** Whether the current proposal can be voted on right now. */
 const canVote = computed(() =>
   isSx.value
-    ? !sxClosed.value && !sxVoted.value && !existingSxVote.value
+    ? !sxBlockReason.value && !sxVoted.value && !existingSxVote.value
     : !offchainClosed.value
 )
 /** Raw indexed SX proposal — carries the authenticator/strategies a vote needs. */
@@ -530,6 +550,8 @@ onUnmounted(() => {
         >
           {{ submittingVote ? t('loading') : t('submitVote') }}
         </button>
+
+        <div v-if="isSx && sxBlockText" class="sxVoteNote">{{ sxBlockText }}</div>
 
         <div v-if="!isSx && existingOffchainVote" class="sxVoteNote">
           {{ t('offchainAlreadyVoted') }}
