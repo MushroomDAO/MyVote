@@ -627,6 +627,12 @@ describe('AirAccount bridge — Login never silently no-ops', () => {
     expect(h.navigate).toHaveBeenCalledTimes(1)
   })
 
+  it('tags SSO failures with stable i18n codes', () => {
+    // The shell (App.vue) maps these via errorKey() instead of showing raw strings.
+    expect(new SsoNoSessionError()).toMatchObject({ code: 'ssoNoSession' })
+    expect(new SsoCodeRejectedError('x')).toMatchObject({ code: 'ssoCodeRejected' })
+  })
+
   it('a silent restore joining an interactive flight still shares the single code exchange', async () => {
     const h = createHarness(`${APP_URL}?code=${CODE}`)
     h.fetchImpl.mockResolvedValue(

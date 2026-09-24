@@ -1,4 +1,5 @@
 import { COS72_API_BASE, COS72_AUTHORIZE_URL, SSO_CALLBACK_PATH } from '../config'
+import { AppError } from '../lib/errors'
 import type { AirAccountAdapter } from './airAccountProvider'
 import {
   createPlaceholderKmsSigner,
@@ -86,9 +87,9 @@ export type SsoSession = {
  * already-consumed / redirect_uri-mismatch alike). Retrying the same code is
  * pointless, so the caller must scrub it and send the user back through cos72.
  */
-export class SsoCodeRejectedError extends Error {
+export class SsoCodeRejectedError extends AppError {
   constructor(message: string) {
-    super(message)
+    super('ssoCodeRejected', message)
     this.name = 'SsoCodeRejectedError'
   }
 }
@@ -102,9 +103,9 @@ export class SsoRedirectingError extends Error {
 }
 
 /** No usable session, and we cannot start a login (e.g. during a silent restore). */
-export class SsoNoSessionError extends Error {
+export class SsoNoSessionError extends AppError {
   constructor(message = '未检测到 AirAccount 会话,请通过 cos72 登录') {
-    super(message)
+    super('ssoNoSession', message)
     this.name = 'SsoNoSessionError'
   }
 }
@@ -213,7 +214,7 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
   let currentUser: AuthUser | null = null
 
   function requireApiBase(): string {
-    if (!apiBase) throw new Error('cos72 API 未配置:请设置 VITE_COS72_API')
+    if (!apiBase) throw new AppError('ssoNotConfigured', 'cos72 API 未配置:请设置 VITE_COS72_API')
     return apiBase
   }
 
@@ -348,7 +349,7 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
   /** Sends the browser to cos72's SSO start page. Never returns normally. */
   function redirectToLogin(): never {
     if (!authorizeUrl) {
-      throw new Error('cos72 登录地址未配置:请设置 VITE_COS72_API 或 VITE_COS72_AUTHORIZE_URL')
+      throw new AppError('ssoNotConfigured', 'cos72 登录地址未配置:请设置 VITE_COS72_API 或 VITE_COS72_AUTHORIZE_URL')
     }
     const redirectUri = prepareLogin()
     const target = new URL(authorizeUrl)
@@ -372,7 +373,7 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
       })
     } catch (e) {
       // Network failure: the code may well still be unspent, so keep it for a retry.
-      throw new Error(`SSO 交换请求失败: ${e instanceof Error ? e.message : String(e)}`)
+      throw new AppError('ssoExchangeFailed', `SSO 交换请求失败: ${e instanceof Error ? e.message : String(e)}`)
     }
 
     if (!response.ok) {
@@ -383,7 +384,7 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
         throw new SsoCodeRejectedError(`SSO 交换失败 (${response.status}): ${detail}`)
       }
       // 5xx — cos72 is unwell, not the code. Retryable.
-      throw new Error(`SSO 交换失败 (${response.status}): ${detail}`)
+      throw new AppError('ssoExchangeFailed', `SSO 交换失败 (${response.status}): ${detail}`)
     }
 
     const payload: unknown = await response.json()
@@ -420,7 +421,7 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
         headers: { Authorization: `Bearer ${stored.token}`, Accept: 'application/json' }
       })
     } catch (e) {
-      throw new Error(`SSO 校验请求失败: ${e instanceof Error ? e.message : String(e)}`)
+      throw new AppError('ssoVerifyFailed', `SSO 校验请求失败: ${e instanceof Error ? e.message : String(e)}`)
     }
 
     if (response.status === 401 || response.status === 403) {
@@ -428,14 +429,15 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
     }
     if (!response.ok) {
       // Server-side trouble — keep the session, just don't log in on this attempt.
-      throw new Error(
+      throw new AppError(
+        'ssoVerifyFailed',
         `SSO 校验失败 (${response.status}): ${await readErrorMessage(response, response.statusText)}`
       )
     }
 
     const payload: unknown = await response.json()
     if (!isRecord(payload)) {
-      throw new Error('SSO 校验返回了非法响应')
+      throw new AppError('ssoVerifyFailed', 'SSO 校验返回了非法响应')
     }
     if (payload.valid !== true) {
       throw new SsoCodeRejectedError('SSO 会话已失效,请重新登录')
@@ -542,9 +544,9 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
 
   function requireToken(address: string): SsoSession {
     const stored = getSession()
-    if (!stored) throw new Error('AirAccount 会话已过期,请重新登录')
+    if (!stored) throw new AppError('ssoSessionExpired', 'AirAccount 会话已过期,请重新登录')
     if (address && stored.aaAddress.toLowerCase() !== address.toLowerCase()) {
-      throw new Error('签名地址与当前 AirAccount 会话不匹配')
+      throw new AppError('accountMismatch', '签名地址与当前 AirAccount 会话不匹配')
     }
     return stored
   }

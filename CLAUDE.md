@@ -128,7 +128,7 @@ Per-host overrides are injected by the edge function — see `docs/M2-multi-tena
 - **AirAccount** Web2 login: the cos72 SSO flow + `KmsSigner` seam are implemented, but the remote KMS signer (E-5) and cos72's SSO landing page are **not delivered yet**, so AirAccount signing throws in production.
 - **Vote write path is hand-rolled** (`lib/snapshotVote.ts`, `viem`): `snapshot.js`'s `Client712` hardcodes ethers v5, which is why ethers/snapshot.js were dropped.
 - **SPA routing**: all routes fall back to `index.html`. `public/_redirects` handles this for Netlify/CF Pages. Vercel handles it automatically.
-- Default locale is **zh-CN**; English is the fallback. The **vote path** returns coded errors translated in the UI (`lib/errors.ts`); the auth/SSO layer still throws hardcoded Chinese in places — an open i18n gap.
+- Default locale is **zh-CN**; English is the fallback. Errors from the vote path and the auth/SSO path carry stable codes (`lib/errors.ts`) translated in the UI (`resolveErrorMessage`, App.vue); the raw message stays as a readable fallback.
 - **Environments share one Pages project**: `main` → production KV, other branches → preview KV. Deploy previews with `apps/web/scripts/deploy-preview.sh` — a bare `wrangler pages deploy` repoints the preview binding at production data (see `docs/deployment.md` §2).
 - Proposal bodies are rendered as **Markdown** (`marked` + `dompurify`).
 

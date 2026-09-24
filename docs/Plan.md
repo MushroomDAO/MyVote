@@ -47,11 +47,13 @@
 
 **目标**：把「链下专用」的投票写路径抽象成可替换后端，并补齐读取路径的健壮性与测试。
 
-- [ ] 抽出 `VoteBackend` 接口，`snapshotVote.ts` 作为链下默认实现（不改行为）。
-- [ ] 读取路径加**过期响应守卫**（请求令牌），修 `SpacePage` / `ProposalPage` / `ExplorePage` 的乱序覆盖竞态（见 `docs/architecture-review.md` 建议 1）。
-- [ ] 补读取路径测试：`lib/graphql.ts`、`lib/cache.ts`、三个页面组件的分页/缓存逻辑。
-- [ ] 投票后失效相关缓存；Explore 缓存 key 按租户隔离。
-- [ ] 错误信息接入 i18n（去掉硬编码中文）。
+- [x] 抽出 `VoteBackend` 接口，`snapshotVote.ts` 作为链下默认实现（不改行为）。
+- [x] 读取路径加**过期响应守卫**（请求令牌），修 `SpacePage` / `ProposalPage` / `ExplorePage` 的乱序覆盖竞态（见 `docs/architecture-review.md` 建议 1）。
+- [x] 补读取路径测试：`lib/sx/*`、`lib/cache.ts`、`lib/requestGuard.ts`，以及页面组件的竞态与协议分流。
+      _`lib/graphql.ts` 自身仍无单测（薄封装，由页面测试间接覆盖）。_
+- [x] Explore 缓存 key 按租户（host）隔离；投票后失效：Explore 缓存不含投票数据，暂无必要。
+- [x] 错误信息接入 i18n：投票路径与 auth/SSO 路径均改为稳定错误码
+      （`lib/errors.ts` 的 `ErrorCode` / `errorKey`），UI 侧 `resolveErrorMessage` / `App.vue` 翻译。
 
 ### M4 — AirAccount 生产可用（外部阻塞）
 
