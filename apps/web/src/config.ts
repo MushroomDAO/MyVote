@@ -28,6 +28,14 @@ export const GRAPHQL_ENDPOINT =
 export const SNAPSHOT_APP_NAME = getEnv('VITE_SNAPSHOT_APP_NAME') ?? 'myvote'
 
 /**
+ * Snapshot X multi-chain indexer (GraphQL). Used only for on-chain spaces; the
+ * off-chain Hub above stays the default read path.
+ */
+export const SX_API_ENDPOINT = stripTrailingSlash(
+  getEnv('VITE_SX_API') ?? 'https://api.snapshot.box'
+)
+
+/**
  * cos72 backend origin (scheme + host, no path). The SSO endpoints live under
  * `${VITE_COS72_API}/api/v1`. Empty when unset — the AirAccount bridge then
  * raises a configuration error instead of calling a wrong origin.

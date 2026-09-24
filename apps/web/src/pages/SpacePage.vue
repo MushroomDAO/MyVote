@@ -3,9 +3,11 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
-import { GRAPHQL_ENDPOINT } from '../config'
+import { GRAPHQL_ENDPOINT, SX_API_ENDPOINT } from '../config'
 import { fetchSpaceWithProposals, type ProposalListItem, type Space } from '../lib/graphql'
 import { createRequestGuard } from '../lib/requestGuard'
+import { fetchSxProposals, fetchSxSpace, type SxProposal } from '../lib/sx/api'
+import { protocolForSpaceId } from '../lib/voteRouting'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -22,6 +24,8 @@ const loading = ref(false)
 const loadingMore = ref(false)
 const error = ref<string | null>(null)
 const hasMore = ref(true)
+/** True when the current space is a Snapshot X (on-chain) space. */
+const isSx = ref(false)
 
 const dtf = computed(
   () =>
@@ -38,6 +42,11 @@ function formatTs(seconds: number) {
   return dtf.value.format(new Date(seconds * 1000))
 }
 
+/** Adapts an indexed SX proposal to the list item the template renders. */
+function sxListItem(p: SxProposal): ProposalListItem {
+  return { id: String(p.proposalId), title: p.title ?? '', created: p.start, state: p.state }
+}
+
 async function loadSpace(skip: number) {
   if (!spaceId.value) return
   if (skip === 0) {
@@ -49,7 +58,26 @@ async function loadSpace(skip: number) {
   }
   error.value = null
   const token = guard.next()
+  const sx = protocolForSpaceId(spaceId.value) === 'snapshot-x'
+  isSx.value = sx
   try {
+    if (sx) {
+      // On-chain space: read from the SX indexer instead of the off-chain Hub.
+      const [sxSpace, page] = await Promise.all([
+        fetchSxSpace(SX_API_ENDPOINT, spaceId.value),
+        fetchSxProposals(SX_API_ENDPOINT, spaceId.value, { first: PAGE_SIZE, skip })
+      ])
+      if (!guard.isCurrent(token)) return
+
+      space.value = sxSpace
+        ? { id: sxSpace.id, name: sxSpace.name ?? sxSpace.id, about: sxSpace.about ?? undefined }
+        : null
+      const items = page.map(sxListItem)
+      proposals.value = skip === 0 ? items : [...proposals.value, ...items]
+      hasMore.value = page.length === PAGE_SIZE
+      return
+    }
+
     const data = await fetchSpaceWithProposals(GRAPHQL_ENDPOINT, {
       spaceId: spaceId.value,
       first: PAGE_SIZE,
@@ -81,6 +109,17 @@ async function loadSpace(skip: number) {
 
 function loadMore() {
   void loadSpace(proposals.value.length)
+}
+
+/**
+ * Off-chain proposal ids are globally unique (a hash), so they go straight in
+ * the path. SX proposal ids are only unique within their space, so the space
+ * rides along as a query param instead of a slash-bearing path segment.
+ */
+function proposalLink(p: ProposalListItem) {
+  return isSx.value
+    ? { path: `/proposal/${p.id}`, query: { space: spaceId.value } }
+    : `/proposal/${p.id}`
 }
 
 watch(spaceId, () => {
@@ -122,7 +161,7 @@ onMounted(() => {
       <div v-if="proposals.length === 0" class="muted">{{ t('empty') }}</div>
       <ul v-else class="list">
         <li v-for="p in proposals" :key="p.id" class="item">
-          <RouterLink class="proposalTitle" :to="`/proposal/${p.id}`">
+          <RouterLink class="proposalTitle" :to="proposalLink(p)">
             {{ p.title }}
           </RouterLink>
           <div class="meta">
