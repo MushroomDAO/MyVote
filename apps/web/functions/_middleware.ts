@@ -40,6 +40,22 @@ type TenantConfig = {
   logo?: string | null
   description?: string
   colors?: Record<string, string>
+  /** Registrant contact (M4-B). Internal — never injected into the page. */
+  contactEmail?: string
+}
+
+/**
+ * Allowlist of fields that may reach window.__TENANT__. Everything else kept in
+ * the KV record (e.g. contactEmail) must not become public page source.
+ */
+function toPublicTenant(config: TenantConfig): TenantConfig {
+  return {
+    ...(config.spaceId !== undefined ? { spaceId: config.spaceId } : {}),
+    ...(config.name !== undefined ? { name: config.name } : {}),
+    ...(config.logo !== undefined ? { logo: config.logo } : {}),
+    ...(config.description !== undefined ? { description: config.description } : {}),
+    ...(config.colors !== undefined ? { colors: config.colors } : {})
+  }
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -90,7 +106,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   let html = await response.text()
-  const script = `<script>window.__TENANT__=${JSON.stringify(tenantConfig)}<\/script>`
+  const script = `<script>window.__TENANT__=${JSON.stringify(toPublicTenant(tenantConfig))}<\/script>`
   html = html.replace('</head>', `${script}</head>`)
 
   return new Response(html, {

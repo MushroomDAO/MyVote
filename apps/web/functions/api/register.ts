@@ -25,7 +25,13 @@ type RegisterBody = {
   name: string
   spaceId: string
   description?: string
+  /** Registrant contact email (M4-B interim identity). Stored as contact only. */
+  email?: string
 }
+
+// Shared with the app (single tested source) — functions are bundled by esbuild,
+// so a relative import into src is fine as long as the module stays browser-free.
+import { isValidEmail } from '../../src/lib/email'
 
 function isValidName(name: string): boolean {
   return /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(name)
@@ -54,6 +60,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const name = body.name?.toLowerCase().trim() ?? ''
   const spaceId = body.spaceId?.trim() ?? ''
   const description = body.description?.trim() ?? ''
+  const email = body.email?.trim().toLowerCase() ?? ''
 
   // --- Validation ---
   if (!name) return Response.json({ error: 'name is required' }, { status: 400 })
@@ -64,6 +71,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     )
   }
   if (!spaceId) return Response.json({ error: 'spaceId is required' }, { status: 400 })
+  if (!email) return Response.json({ error: 'email is required' }, { status: 400 })
+  if (!isValidEmail(email)) {
+    return Response.json({ error: 'email is invalid' }, { status: 400 })
+  }
 
   const rootDomain = context.env.CF_ROOT_DOMAIN ?? 'forest.mushroom.cv'
   const domain = `${name}.${rootDomain}`
@@ -83,6 +94,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     spaceId,
     name,
     description: description || undefined,
+    // Contact only. _middleware allowlists which fields reach window.__TENANT__,
+    // so this never becomes public page source.
+    contactEmail: email,
     createdAt: new Date().toISOString(),
   }
   await context.env.TENANTS_KV.put(domain, JSON.stringify(tenantConfig))
