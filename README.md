@@ -124,6 +124,8 @@ Handy entry points:
 - [`docs/snapshot-x-integration.md`](./docs/snapshot-x-integration.md) — Snapshot X (on-chain) integration guide
 - [`docs/testnet-space-e2e.md`](./docs/testnet-space-e2e.md) — Sepolia testnet space end-to-end (ENSv2 quirks, reproducible steps)
 - [`docs/sx-testnet.md`](./docs/sx-testnet.md) — Snapshot X testnet map + verified Sepolia on-chain vote
+- [`docs/registration-atomicity.md`](./docs/registration-atomicity.md) — registration name claim via Durable Objects
+- [`docs/cos72-airaccount-requirements.md`](./docs/cos72-airaccount-requirements.md) — interface requests for cos72 / AirAccount (M4)
 - [`docs/deployment.md`](./docs/deployment.md) — environments, KV namespaces, secrets, runbook
 - [`docs/M1-clone-deploy.md`](./docs/M1-clone-deploy.md) — clone & deploy for a new community
 - [`docs/M2-multi-tenant.md`](./docs/M2-multi-tenant.md) — multi-tenancy
