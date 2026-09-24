@@ -55,8 +55,24 @@ apps/web/scripts/deploy-preview.sh [branch]   # 默认 dev
 
 ## 4. 密钥与环境变量
 
-**production**（Pages → Settings → Environment variables，加密项不在仓库）：
-`CF_API_TOKEN`、`CF_ACCOUNT_ID`、`CF_PAGES_PROJECT`、`CF_ZONE_ID`、`CF_ROOT_DOMAIN`
+**production**（2026-09-24 实测后的现状）：
+
+| 变量 | 类型 | 值/来源 |
+|---|---|---|
+| `CF_API_TOKEN` | secret | CF API token（开通 Pages 自定义域名用） |
+| `CF_ACCOUNT_ID` | **secret** | 账户 ID |
+| `CF_PAGES_PROJECT` | **secret** | `myvote` |
+| `CF_ZONE_ID` | ~~secret~~ | **当前未配置**；代码里没有使用（只在 `Env` 类型里声明），不影响注册。 |
+| `CF_ROOT_DOMAIN` | plain | `forest.mushroom.cv`（来自 `wrangler.toml` 的 `[vars]`） |
+| `SNAPSHOT_HUB` | plain | `https://testnet.hub.snapshot.org`（来自 `[vars]`，必须与前端 `VITE_SNAPSHOT_HUB` 一致） |
+| `RESEND_API_KEY` / `EMAIL_CODE_SECRET` | secret | 邮箱验证码（M6-3） |
+
+> ⚠️ **踩过的坑：`wrangler pages deploy` 会按 `wrangler.toml` 的 `[vars]` 同步 plain 变量，
+> 并**删掉不在 toml 里的其它 plain 变量**（secret 不受影响）。**
+> 2026-09-24 首次生产部署就把 `CF_ACCOUNT_ID` / `CF_PAGES_PROJECT` / `CF_ZONE_ID` 三个 plain 变量清掉了，
+> 导致注册响应退化成 `domainStatus: 'unmanaged'`（不再开通域名）。
+> **因此账户级配置必须用 `wrangler pages secret put` 存成 secret**（逐键 upsert，且能在部署中存活）。
+> 部署后请用下面 §5 的检查项确认一次。
 
 **注册邮箱验证码（M6-3，可选）**：
 
@@ -93,8 +109,9 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 - 改完变量需要**重新部署**才生效（`deploy-preview.sh dev` / 生产部署）。
 - `EMAIL_FROM` 不配也行：`functions/api/email-code.ts` 的默认值就是 `hello@idoris.ai`。
 - 生产作用域可以直接用 `cat secret.txt | npx wrangler pages secret put RESEND_API_KEY --project-name myvote`
-  （逐键 upsert，不会碰其它变量）。**生产已配置** `RESEND_API_KEY` + `EMAIL_CODE_SECRET`，
-  但要等下一次生产部署才生效（那之前生产注册仍是开放的）。
+  （逐键 upsert，不会碰其它变量）。
+- **2026-09-24 生产已部署并 live 验证**：`/api/email-code` 200 真实发信 → 收码 → `/api/register` 200
+  且 `domainStatus: active`（真的开通了 Pages 自定义域名）。验证用的探针租户记录与自定义域名已删除。
 
 **2026-09-24 预览实测**：`POST /api/email-code` → 200，真实从 `hello@idoris.ai` 发出；一次性邮箱收到 6 位码；
 错误码 → 400 `email_code_mismatch`；正确码 → 200（`domainStatus: unmanaged`）。
@@ -137,7 +154,20 @@ cd apps/web
 npx -y wrangler@4 pages deploy dist --project-name myvote --branch main --commit-dirty=true
 ```
 
-> 生产部署前先确认 `wrangler.toml` 的 `[[kv_namespaces]].id` 仍是生产命名空间。
+**生产部署检查项**（2026-09-24 实战补的）：
+
+1. **先部署依赖的 Worker**：`cd apps/tenant-registry && npx wrangler@4 deploy`（DO class 不能在 Pages 里声明）。
+2. 确认 `wrangler.toml` 的 `[[kv_namespaces]].id` 仍是生产命名空间 `b48caba076cb477698121c95f9e69d9e`。
+3. 部署后**立刻查一遍环境变量**（`wrangler pages deploy` 会清掉不在 `[vars]` 里的 plain 变量）：
+   ```bash
+   curl -s -H "Authorization: Bearer $TOKEN" \
+     "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/pages/projects/myvote" \
+     | jq '.result.deployment_configs.production.env_vars | keys'
+   # 期望包含：CF_ACCOUNT_ID, CF_API_TOKEN, CF_PAGES_PROJECT, CF_ROOT_DOMAIN, EMAIL_CODE_SECRET, RESEND_API_KEY, SNAPSHOT_HUB
+   ```
+4. 冒烟：`curl -s -o /dev/null -w '%{http_code}\n' https://forest.mushroom.cv/`（200 + `id="app"`）。
+5. 端到端：`POST /api/email-code` 用真实邮箱 → 收码 → `POST /api/register`，期望 `domainStatus: 'active'`；
+   **验证用的名字记得删掉**（`DELETE .../pages/projects/myvote/domains/<domain>` + 删生产 KV 键）。
 
 ---
 
