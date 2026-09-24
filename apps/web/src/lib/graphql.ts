@@ -174,3 +174,35 @@ export async function fetchProposal(
     signal
   )
 }
+
+/** The connected account's vote on one proposal, when it has one. */
+export type VoterVote = {
+  id: string
+  /** 1-based index for single-choice/basic; array/object for the other types. */
+  choice: unknown
+}
+
+/**
+ * Reads the account's existing vote. Off-chain votes may be replaced, so this
+ * feeds a "you already voted" note and a prefill rather than a hard block.
+ */
+export async function fetchVoterVote(
+  endpoint: string,
+  params: { proposalId: string; voter: string; signal?: AbortSignal }
+): Promise<VoterVote | null> {
+  const { signal, ...variables } = params
+  const data = await graphqlRequest<{ votes: VoterVote[] }>(
+    endpoint,
+    `
+      query VoterVote($proposalId: String!, $voter: String!) {
+        votes(first: 1, where: { proposal: $proposalId, voter: $voter }) {
+          id
+          choice
+        }
+      }
+    `,
+    variables,
+    signal
+  )
+  return data.votes?.[0] ?? null
+}

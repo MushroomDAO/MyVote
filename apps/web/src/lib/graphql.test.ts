@@ -4,6 +4,7 @@ import {
   fetchProposal,
   fetchSpaceWithProposals,
   fetchSpaces,
+  fetchVoterVote,
   graphqlRequest
 } from './graphql'
 
@@ -122,5 +123,28 @@ describe('query wrappers', () => {
     // A signal has no enumerable fields, so leaking it would send `signal: {}`
     // to the hub — an undeclared variable.
     expect(JSON.parse(init.body as string).variables).toEqual({ proposalId: '0x1' })
+  })
+
+  it('fetchVoterVote returns the account vote and forwards the signal', async () => {
+    const fetchImpl = stubFetch({ data: { votes: [{ id: '0xv', choice: 2 }] } })
+    const controller = new AbortController()
+
+    const vote = await fetchVoterVote('https://hub.test/graphql', {
+      proposalId: '0xp',
+      voter: '0xabc',
+      signal: controller.signal
+    })
+
+    expect(vote).toEqual({ id: '0xv', choice: 2 })
+    const init = fetchImpl.mock.calls[0]![1] as RequestInit
+    expect(init.signal).toBe(controller.signal)
+    expect(JSON.parse(init.body as string).variables).toEqual({ proposalId: '0xp', voter: '0xabc' })
+  })
+
+  it('fetchVoterVote returns null when the account has not voted', async () => {
+    stubFetch({ data: { votes: [] } })
+    await expect(
+      fetchVoterVote('https://hub.test/graphql', { proposalId: '0xp', voter: '0xabc' })
+    ).resolves.toBeNull()
   })
 })

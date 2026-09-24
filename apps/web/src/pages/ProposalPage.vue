@@ -10,7 +10,13 @@ import { useAuth } from '../auth/useAuth'
 import { EmailSigningUnsupportedError } from '../auth/emailProvider'
 import { KmsNotConfiguredError } from '../auth/kms'
 import { AppError, resolveErrorMessage, type ErrorCode } from '../lib/errors'
-import { fetchProposal, type Proposal, type ProposalType } from '../lib/graphql'
+import {
+  fetchProposal,
+  fetchVoterVote,
+  type Proposal,
+  type ProposalType,
+  type VoterVote
+} from '../lib/graphql'
 import { createRequestGuard } from '../lib/requestGuard'
 import { type VoteChoice } from '../lib/snapshotVote'
 import { createEthersCompatSigner, sxTxUrl } from '../lib/sx/backend'
@@ -48,6 +54,8 @@ const isSx = computed(() => sxSpaceId.value !== null)
 const existingSxVote = ref<SxVote | null>(null)
 /** Set right after this session's on-chain vote, before the indexer catches up. */
 const sxVoted = ref(false)
+/** The account's current off-chain vote, so the ballot can show/prefill it. */
+const existingOffchainVote = ref<VoterVote | null>(null)
 /** SX proposals keep their indexed state; use it to disable an impossible vote. */
 const sxClosed = computed(() => sxProposal.value?.state.toLowerCase() === 'closed')
 
@@ -259,6 +267,32 @@ async function loadExistingSxVote() {
   }
 }
 
+/**
+ * Reads the account's current off-chain vote so the ballot can show and prefill
+ * it. Off-chain votes are replaceable, so this never disables submit.
+ */
+async function loadExistingOffchainVote() {
+  existingOffchainVote.value = null
+  const address = auth.user.value?.address
+  if (isSx.value || !address || !proposalId.value) return
+  const token = voteGuard.next()
+  try {
+    const vote = await fetchVoterVote(GRAPHQL_ENDPOINT, {
+      proposalId: proposalId.value,
+      voter: address,
+      signal: voteGuard.signal
+    })
+    if (!voteGuard.isCurrent(token)) return
+    existingOffchainVote.value = vote
+    // Prefill a plain 1-based index, and only before the user has picked.
+    if (vote && typeof vote.choice === 'number' && selectedChoice.value === null) {
+      selectedChoice.value = vote.choice
+    }
+  } catch {
+    // Best-effort; an unknown vote state just leaves the ballot empty.
+  }
+}
+
 async function loadProposal() {
   if (!proposalId.value) return
   loading.value = true
@@ -268,6 +302,7 @@ async function loadProposal() {
   selectedChoice.value = null
   reason.value = ''
   sxVoted.value = false
+  existingOffchainVote.value = null
   const token = guard.next()
   try {
     const { sx, proposal: next } = await fetchProposalData(guard.signal)
@@ -275,6 +310,7 @@ async function loadProposal() {
     sxProposal.value = sx
     proposal.value = next
     if (sx) void loadExistingSxVote()
+    else void loadExistingOffchainVote()
   } catch (e) {
     if (!guard.isCurrent(token)) return
     error.value = e instanceof Error ? e.message : String(e)
@@ -343,6 +379,7 @@ async function submitVote() {
     } else {
       // Off-chain tallies update immediately; pull them in behind the receipt.
       void refreshOffchainProposal()
+      void loadExistingOffchainVote()
     }
   } catch (e) {
     if (e instanceof KmsNotConfiguredError) {
@@ -484,6 +521,10 @@ onUnmounted(() => {
         >
           {{ submittingVote ? t('loading') : t('submitVote') }}
         </button>
+
+        <div v-if="!isSx && existingOffchainVote" class="sxVoteNote">
+          {{ t('offchainAlreadyVoted') }}
+        </div>
 
         <div v-if="isSx && (sxVoted || existingSxVote)" class="sxVoteNote">
           {{ t('sxAlreadyVoted') }}
