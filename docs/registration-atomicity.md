@@ -83,9 +83,27 @@ try {
 
 ### 2.4 绑定与迁移
 
-`apps/web/wrangler.toml`（生产）与 `apps/web/wrangler.preview.toml`（预览）都要加：
+⚠️ **关键约束（核对官方文档后修正）**：Cloudflare 明确写着 *"You must create a Durable Object Worker
+and bind it to your Pages project"*、*"You cannot create and deploy a Durable Object within a Pages
+project"*（[Pages › Bindings › Durable Objects](https://developers.cloudflare.com/pages/functions/bindings/)）。
+所以 **DO class 不能放在 `apps/web/functions/` 里**——必须先有**独立 Worker**，再由 Pages 通过
+`script_name` 绑定过去。
+
+结构：
+
+```
+apps/tenant-registry/            # 新的小 Worker（无第三方依赖）
+  wrangler.toml                  # [[durable_objects.bindings]] + [[migrations]]
+  src/index.ts                   # export class TenantRegistry + 一个 404 fetch
+```
+
+Worker 的 `wrangler.toml`：
 
 ```toml
+name = "myvote-tenant-registry"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
 [[durable_objects.bindings]]
 name = "TENANT_REGISTRY"
 class_name = "TenantRegistry"
@@ -95,11 +113,20 @@ tag = "v1"
 new_sqlite_classes = ["TenantRegistry"]
 ```
 
-- 用 `new_sqlite_classes`（SQLite 后端）而不是 `new_classes`：新项目推荐，存储便宜；
-  我们的用法只是 `storage.get/put/delete`，两者都支持。
-- class 放在 `apps/web/functions/tenantRegistry.ts`，与 Pages Functions 一起打包，
-  这样 `class_name` 能被解析到（Pages 的 DO class 必须来自 Functions bundle）。
-- **预览与生产各自一套 DO 命名空间**（不同 Pages 项目部署各自迁移），互不影响。
+Pages 侧（`apps/web/wrangler.toml` 生产、`apps/web/wrangler.preview.toml` 预览）只加绑定，
+不带 `[[migrations]]`（迁移属于 Worker）：
+
+```toml
+[[durable_objects.bindings]]
+name = "TENANT_REGISTRY"
+class_name = "TenantRegistry"
+script_name = "myvote-tenant-registry"          # 预览：myvote-tenant-registry-preview
+```
+
+- 用 `new_sqlite_classes`（SQLite 后端）：新项目推荐、存储便宜；我们的用法只是
+  `storage.get/put/delete`，两种后端都支持。
+- **预览与生产用两个不同的 Worker**（各自独立命名空间）：否则预览里被测占用的名字
+  会把生产也挡住。
 
 ### 2.5 兼容与降级
 
@@ -124,37 +151,48 @@ handler **回退到原来的 KV reserve+read-back** 路径，行为不变、只�
 3. **release 只删自己的 token**：别的 token 调 release 不会删掉持有者的认领；
 4. **未绑定 DO 时回退**：不传 `TENANT_REGISTRY` 时行为与旧实现一致（现有用例即为回归）。
 
-### 3.2 本地并发 e2e（真 DO，不是假件）
+### 3.2 并发 e2e（真 DO，不是假件）
+
+因为 DO 在独立 Worker 里，**部署后的预览**是最真实的验证环境（本地要同时起两个
+`wrangler dev`，见下）。先部署 Worker + 预览，然后并发打同一个名字：
 
 ```bash
-cd apps/web && ./node_modules/.bin/vite build
-npx -y wrangler@4 pages dev dist --port 8799 --ip 127.0.0.1
-# 然后并发打同一个名字：
 for i in $(seq 1 8); do curl -s -o /dev/null -w '%{http_code}\n' \
-  -X POST http://127.0.0.1:8799/api/register -H 'content-type: application/json' \
+  -X POST https://dev.myvote-1jx.pages.dev/api/register -H 'content-type: application/json' \
   --data '{"name":"raceprobe","spaceId":"ens.eth","email":"race@example.com"}' & done; wait
 # 期望：恰好一个 200，其余 409
 ```
 
-这是这一步的**关键证据**——旧实现在同样的并发下会多次 200。
+这是这一步的**关键证据**——旧实现在同样的并发下会多次 200。预览没有 `CF_API_TOKEN`，
+所以 200 的那个 `domainStatus` 是 `unmanaged`（不会真开证书）；跑完删掉预览 KV 里的探针记录。
+
+本地也可以验（官方要求的两个进程）：
+
+```bash
+cd apps/tenant-registry && npx -y wrangler@4 dev --port 8800        # DO Worker
+cd apps/web && npx -y wrangler@4 pages dev dist --port 8799 \
+  --do TENANT_REGISTRY=TenantRegistry@myvote-tenant-registry
+```
 
 ---
 
 ## 4. 迁移与回滚
 
-1. 先合代码 + 配置到 `dev`，`deploy-preview.sh dev` 部署预览（预览 DO 命名空间独立）；
-2. 在预览上跑 §3.2 的并发验证；
-3. 生产部署时 `wrangler.toml` 的 migration `v1` 会在 Pages 项目上创建 DO 命名空间；
-   **现有 KV 记录不受影响**（DO 只管新的认领，`check` 仍读 KV）。
-   因为生产目前还是测试阶段、没有真实租户数据，**不需要回填**。
-4. 回滚 = 回退代码；DO 命名空间留着不碍事（未绑定时走旧路径）。
+1. **先部署 Worker**：`cd apps/tenant-registry && npx -y wrangler@4 deploy`（预览/生产各一个：
+   `...-preview` 与正式名）。迁移 `v1` 在这一步创建 DO 命名空间。
+2. 再合 Pages 侧代码 + 绑定到 `dev`，`deploy-preview.sh dev` 部署预览；在预览上跑 §3.2 并发验证。
+3. 生产部署 Pages（`wrangler.toml` 里的绑定指向正式 Worker）。**现有 KV 记录不受影响**
+   （DO 只管新的认领，`check` 仍读 KV）；生产目前是测试阶段、没有真实租户数据，**不需要回填**。
+4. 回滚 = 去掉 Pages 绑定或回退代码；未绑定时走旧 KV 路径，Worker/命名空间留着不碍事。
 
 ---
 
 ## 5. 明确不做（以及为什么）
 
 - **全局单例 DO**：把所有注册串行化，单点抖动放大，没必要。
-- **D1 / R2 / 外部锁**：为了一个「唯一性判定」引入新数据库不划算。
+- **D1（`domain` 主键 + `INSERT … ON CONFLICT DO NOTHING`）**：Pages 原生支持、也能做到原子认领，
+  但它是**单写者**数据库，所有注册争同一把写锁；DO 只在同名竞争时才排队，也更贴合原始结论。
+  如果后续要更多关系型查询（审计、租户清单），可以再迁到 D1。
 - **给 `check` 也走 DO**：收益小、延迟翻倍；`register` 已经兜底。
 - **限流改成 DO**：固定窗口限流本来就是「尽力而为」，不是正确性要求；留作后续。
 
