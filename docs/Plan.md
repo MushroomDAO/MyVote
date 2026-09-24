@@ -82,8 +82,12 @@
       **已在真实 Optimism space 上 live 验证**：
       `SX_LIVE=1 vitest run src/lib/sx/api.test.ts` → Ryu0x167 Space Command
       `0x03C7431e14F7b759Aa44398AD7901e6053c197Bf`（_indexer `oeth`）
-- [ ] **M5-4 页面接线**：ProposalPage 按 `protocolForSpaceId` 选择后端并渲染 SX 投票
-- [ ] 在真实 SX space 上完成一次真实投票（需要投票权 + 钱包；Ryu0x167 可作为目标）
+- [x] **M5-4 页面接线**：`SpacePage` / `ProposalPage` 按 `protocolForSpaceId` 分流——
+      SX space 走 `api.snapshot.box` 读、`ProposalPage` 显示「链上（Snapshot X）」标记，
+      投票经 `createSxBackendFromEip1193` → Mana；链下路径完全不变
+- [x] **代码分割验证**：`@snapshot-labs/sx` 现在是独立 lazy chunk（~851 KB + shutter wasm），
+      仅在实际投 SX 票时加载；主 chunk 仅 +~9 KB
+- [ ] 在真实 SX space 上完成一次真实投票（需要该 space 的投票权 + 钱包；Ryu0x167 可作为目标）
 
 ### M6 — 自助注册安全加固与多租户运维
 

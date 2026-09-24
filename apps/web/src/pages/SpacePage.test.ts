@@ -1,13 +1,24 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import { nextTick } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const { fetchSpaceWithProposals } = vi.hoisted(() => ({
-  fetchSpaceWithProposals: vi.fn()
+// Previously-mounted wrappers stay reactive to the shared route mock, so an
+// earlier test's component would react to this test's navigation too.
+enableAutoUnmount(afterEach)
+
+const { fetchSpaceWithProposals, fetchSxSpace, fetchSxProposals } = vi.hoisted(() => ({
+  fetchSpaceWithProposals: vi.fn(),
+  fetchSxSpace: vi.fn(),
+  fetchSxProposals: vi.fn()
 }))
 
 vi.mock('../lib/graphql', () => ({ fetchSpaceWithProposals }))
+
+vi.mock('../lib/sx/api', () => ({
+  fetchSxSpace: (...args: unknown[]) => fetchSxSpace(...args),
+  fetchSxProposals: (...args: unknown[]) => fetchSxProposals(...args)
+}))
 
 // A reactive route so changing the id fires the component's watch(spaceId).
 vi.mock('vue-router', async () => {
@@ -49,6 +60,23 @@ function spaceResult(id: string, name: string) {
   return { space: { id, name }, proposals: [] }
 }
 
+function sxSpace(id: string, name: string) {
+  return {
+    id,
+    name,
+    about: null,
+    network: 'optimism',
+    authenticators: [],
+    vpDecimals: 0,
+    proposalCount: 0,
+    strategies: []
+  }
+}
+
+afterEach(() => {
+  vi.resetAllMocks()
+})
+
 describe('SpacePage stale-response guard', () => {
   it('keeps the newest space when an older request resolves last', async () => {
     const stale = deferred()
@@ -74,5 +102,38 @@ describe('SpacePage stale-response guard', () => {
 
     expect(wrapper.text()).toContain('Space B')
     expect(wrapper.text()).not.toContain('Space A')
+  })
+
+  it('applies the same guard to concurrent SX reads', async () => {
+    const SX_A = '0x1111111111111111111111111111111111111111'
+    const SX_B = '0x2222222222222222222222222222222222222222'
+
+    const staleSpace = deferred()
+    const freshSpace = deferred()
+    fetchSxSpace
+      .mockReturnValueOnce(staleSpace.promise) // mount -> SX_A
+      .mockReturnValueOnce(freshSpace.promise) // watch -> SX_B
+    fetchSxProposals.mockResolvedValue([])
+
+    route.params.id = SX_A
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await nextTick()
+
+    route.params.id = SX_B
+    await nextTick()
+
+    // The two SX reads run in parallel (Promise.all); the guard is what keeps
+    // the slower older pair from overwriting the newer space.
+    freshSpace.resolve(sxSpace(SX_B, 'SX B'))
+    await flushPromises()
+    staleSpace.resolve(sxSpace(SX_A, 'SX A'))
+    await flushPromises()
+
+    // Diagnostic: confirm both SX loads actually started.
+    expect(fetchSxSpace).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('SX B')
+    expect(wrapper.text()).not.toContain('SX A')
+    // It read on-chain, not from the off-chain Hub.
+    expect(fetchSpaceWithProposals).not.toHaveBeenCalled()
   })
 })

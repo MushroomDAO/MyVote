@@ -25,6 +25,7 @@ const SPACE_WIRE: SxSpaceWire = {
   authenticators: ['0x5f9B7D78c9a37a439D78f801E0E339C6E711e260'],
   vp_decimals: 0,
   proposal_count: 12,
+  _indexer: 'oeth',
   strategies_indices: [0],
   strategies: ['0x34f0AfFF5A739bBf3E285615F50e40ddAaf2A829'],
   strategies_params: ['0x3d998d116d221187f395fc08625b1d5b3bc3ee17f45cc11d869b7165665f391a']
@@ -41,6 +42,7 @@ const PROPOSAL_WIRE: SxProposalWire = {
   max_end: '1726095581',
   scores_total: '3',
   vote_count: 3,
+  _indexer: 'oeth',
   strategies_indices: [0],
   strategies: ['0x34f0AfFF5A739bBf3E285615F50e40ddAaf2A829'],
   strategies_params: ['0x3d998d116d221187f395fc08625b1d5b3bc3ee17f45cc11d869b7165665f391a'],

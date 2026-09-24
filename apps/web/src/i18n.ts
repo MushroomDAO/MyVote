@@ -32,6 +32,9 @@ const messages: Record<AppLocale, Record<string, string>> = {
     emailRequired: '请输入邮箱地址',
     emailInvalid: '邮箱格式不正确',
     emailSigningUnsupported: '邮箱登录暂不支持签名投票，请使用钱包或等待 AirAccount 上线',
+    sxUnknownNetwork: '未知的 Snapshot X 网络',
+    noWallet: '未检测到浏览器钱包',
+    sxOnchain: '链上（Snapshot X）',
     errVoteClockSkew: '签名时间戳超出允许范围（{detail}），通常是本机系统时间不准，请校准后重试',
     errVoteRejected: 'Snapshot hub 拒绝了投票（{status}）：{detail}',
     ssoCompleting: '正在完成登录…',
@@ -94,6 +97,9 @@ const messages: Record<AppLocale, Record<string, string>> = {
     emailInvalid: 'Invalid email address',
     emailSigningUnsupported:
       'Email sign-in cannot sign votes yet — use a wallet or wait for AirAccount',
+    sxUnknownNetwork: 'Unknown Snapshot X network',
+    noWallet: 'No browser wallet detected',
+    sxOnchain: 'On-chain (Snapshot X)',
     errVoteClockSkew:
       'Signature timestamp is outside the allowed range ({detail}) — usually your system clock; sync it and retry',
     errVoteRejected: 'Snapshot hub rejected the vote ({status}): {detail}',

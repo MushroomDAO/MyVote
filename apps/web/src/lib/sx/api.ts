@@ -1,4 +1,9 @@
-import { SX_API_DEFAULT, type SxStrategyConfig, type SxVoteRequest } from './types'
+import {
+  SX_API_DEFAULT,
+  type SxEvmNetworkId,
+  type SxStrategyConfig,
+  type SxVoteRequest
+} from './types'
 
 /**
  * Read path for Snapshot X, against the official multi-chain indexer
@@ -15,7 +20,8 @@ const STRATEGY_FIELDS =
   'strategies_indices strategies strategies_params'
 
 const SPACE_FIELDS =
-  'id protocol metadata { name about } authenticators vp_decimals proposal_count ' + STRATEGY_FIELDS
+  'id protocol metadata { name about } authenticators vp_decimals proposal_count _indexer ' +
+  STRATEGY_FIELDS
 
 export const SX_SPACE_QUERY =
   'query Space($id: String!) { space(id: $id) { ' + SPACE_FIELDS + ' } }'
@@ -31,7 +37,7 @@ export const SX_PROPOSALS_QUERY =
 export const SX_PROPOSAL_QUERY =
   'query Proposal($id: String!) { proposal(id: $id) { ' +
   'id proposal_id metadata { title body choices } state snapshot start min_end max_end ' +
-  'scores_total vote_count ' +
+  'scores_total vote_count _indexer ' +
   STRATEGY_FIELDS +
   ' space { id authenticators ' + STRATEGY_FIELDS + ' } ' +
   ' } }'
@@ -44,6 +50,7 @@ export type SxSpaceWire = {
   authenticators: string[]
   vp_decimals: number
   proposal_count: number
+  _indexer: string
   strategies_indices: number[]
   strategies: string[]
   strategies_params: string[]
@@ -60,6 +67,7 @@ export type SxProposalWire = {
   max_end: string
   scores_total: string | null
   vote_count: number
+  _indexer: string
   strategies_indices: number[]
   strategies: string[]
   strategies_params: string[]
@@ -69,10 +77,26 @@ export type SxProposalWire = {
   >
 }
 
+/** Indexer chain code → sx.js network id. */
+const INDEXER_TO_NETWORK: Record<string, SxEvmNetworkId> = {
+  eth: 'ethereum',
+  oeth: 'optimism',
+  arb1: 'arbitrum',
+  base: 'base',
+  sep: 'sepolia'
+}
+
+/** Maps the indexer's chain code (`oeth`) to an sx.js network id (`optimism`). */
+export function sxNetworkFromIndexer(indexer: string | null | undefined): SxEvmNetworkId | null {
+  if (!indexer) return null
+  return INDEXER_TO_NETWORK[indexer] ?? null
+}
+
 export type SxSpace = {
   id: string
   name: string | null
   about: string | null
+  network: SxEvmNetworkId | null
   authenticators: string[]
   vpDecimals: number
   proposalCount: number
@@ -83,6 +107,7 @@ export type SxProposal = {
   /** Composite id, `<space>/<proposal_id>`. */
   id: string
   proposalId: number
+  network: SxEvmNetworkId | null
   title: string | null
   body: string | null
   choices: string[]
@@ -119,6 +144,7 @@ export function toSxSpace(wire: SxSpaceWire): SxSpace {
     name: wire.metadata?.name ?? null,
     about: wire.metadata?.about ?? null,
     authenticators: wire.authenticators ?? [],
+    network: sxNetworkFromIndexer(wire._indexer),
     vpDecimals: wire.vp_decimals ?? 0,
     proposalCount: wire.proposal_count ?? 0,
     strategies: zipStrategies(wire.strategies_indices, wire.strategies, wire.strategies_params)
@@ -129,6 +155,7 @@ export function toSxProposal(wire: SxProposalWire): SxProposal {
   return {
     id: wire.id,
     proposalId: Number.parseInt(wire.proposal_id, 10),
+    network: sxNetworkFromIndexer(wire._indexer),
     title: wire.metadata?.title ?? null,
     body: wire.metadata?.body ?? null,
     choices: wire.metadata?.choices ?? [],

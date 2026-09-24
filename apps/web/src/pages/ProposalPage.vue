@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
-import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME } from '../config'
+import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME, SX_API_ENDPOINT } from '../config'
 import { useAuth } from '../auth/useAuth'
 import { EmailSigningUnsupportedError } from '../auth/emailProvider'
 import { KmsNotConfiguredError } from '../auth/kms'
@@ -13,7 +13,11 @@ import { resolveErrorMessage } from '../lib/errors'
 import { fetchProposal, type Proposal, type ProposalType } from '../lib/graphql'
 import { createRequestGuard } from '../lib/requestGuard'
 import { type VoteChoice } from '../lib/snapshotVote'
+import { createEthersCompatSigner } from '../lib/sx/backend'
+import { buildSxVoteRequest, fetchSxProposal, type SxProposal } from '../lib/sx/api'
+import { createSxBackendFromEip1193, type Eip1193Provider } from '../lib/sx/provider'
 import { activeVoteBackend } from '../lib/voteBackend'
+import { protocolForSpaceId } from '../lib/voteRouting'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -21,6 +25,18 @@ const auth = useAuth()
 
 const proposalId = computed(() => String(route.params.id ?? ''))
 const guard = createRequestGuard()
+
+/**
+ * SX proposals are only unique within their space, so the space rides in the
+ * query string (`?space=0x…`) instead of as a second path segment.
+ */
+const sxSpaceId = computed(() => {
+  const value = route.query.space
+  return typeof value === 'string' && protocolForSpaceId(value) === 'snapshot-x' ? value : null
+})
+const isSx = computed(() => sxSpaceId.value !== null)
+/** Raw indexed SX proposal — carries the authenticator/strategies a vote needs. */
+const sxProposal = ref<SxProposal | null>(null)
 
 const proposal = ref<Proposal | null>(null)
 const loading = ref(false)
@@ -67,6 +83,57 @@ const voteResults = computed(() => {
   })
 })
 
+/** Adapts an indexed SX proposal to the shape the template renders. */
+function sxToProposal(sx: SxProposal): Proposal {
+  return {
+    id: sx.id,
+    title: sx.title ?? sx.id,
+    body: sx.body ?? '',
+    choices: sx.choices,
+    type: 'basic',
+    start: sx.start,
+    end: sx.end,
+    snapshot: sx.snapshot === null ? '' : String(sx.snapshot),
+    state: sx.state,
+    author: '',
+    created: sx.start,
+    votes: sx.voteCount,
+    scores: [],
+    scores_total: 0,
+    space: { id: sx.space?.id ?? sxSpaceId.value ?? '', name: sx.space?.id ?? '' }
+  }
+}
+
+/**
+ * SX vote: build the sx.js Vote from indexed data and submit it through Mana
+ * (gasless). The wallet's EIP-1193 provider feeds the read-side adapter; the
+ * signature itself still goes through the active auth provider.
+ */
+async function castSxVote(address: string, choice: number) {
+  const sx = sxProposal.value
+  if (!sx) throw new Error('SX proposal not loaded')
+  if (!sx.network) throw new Error(t('sxUnknownNetwork'))
+
+  const eip1193 = (window as unknown as { ethereum?: Eip1193Provider }).ethereum
+  if (!eip1193) throw new Error(t('noWallet'))
+
+  const signer = createEthersCompatSigner(address, (typedData) =>
+    auth.provider.value.signTypedData({ address, typedData })
+  )
+  const backend = createSxBackendFromEip1193({ network: sx.network, eip1193 })
+
+  return backend.castVote(
+    buildSxVoteRequest({
+      spaceId: sx.space?.id ?? sxSpaceId.value ?? '',
+      authenticators: sx.space?.authenticators ?? [],
+      strategies: sx.space?.strategies ?? sx.strategies,
+      proposalId: sx.proposalId,
+      choice
+    }),
+    signer
+  )
+}
+
 async function loadProposal() {
   if (!proposalId.value) return
   loading.value = true
@@ -77,6 +144,18 @@ async function loadProposal() {
   reason.value = ''
   const token = guard.next()
   try {
+    if (sxSpaceId.value) {
+      const sx = await fetchSxProposal(
+        SX_API_ENDPOINT,
+        `${sxSpaceId.value}/${proposalId.value}`
+      )
+      if (!guard.isCurrent(token)) return
+      sxProposal.value = sx
+      proposal.value = sx ? sxToProposal(sx) : null
+      return
+    }
+
+    sxProposal.value = null
     const data = await fetchProposal(GRAPHQL_ENDPOINT, { proposalId: proposalId.value })
     if (!guard.isCurrent(token)) return
     proposal.value = data.proposal
@@ -117,9 +196,6 @@ async function submitVote() {
       await auth.connect()
     }
 
-    // Sign through the active auth provider — wallet or AirAccount/KMS. The page
-    // no longer touches window.ethereum, and submission goes through the active
-    // VoteBackend, so both the auth and protocol seams hold.
     // Email sign-in is identity-only (interim M4) — no key, so no signature.
     if (auth.activeProviderId.value === 'email') {
       throw new EmailSigningUnsupportedError()
@@ -128,20 +204,22 @@ async function submitVote() {
     const address = auth.user.value?.address
     if (!address) throw new Error(t('noAccount'))
 
-    const receipt = await activeVoteBackend.castVote({
-      vote: {
-        from: address,
-        space: proposal.value.space.id,
-        proposal: proposal.value.id,
-        type: proposal.value.type,
-        choice: encodeChoice(proposal.value.type, selectedChoice.value),
-        reason: reason.value,
-        app: SNAPSHOT_APP_NAME
-      },
-      signTypedData: (typedData) => auth.provider.value.signTypedData({ address, typedData })
-    })
-
-    voteReceipt.value = receipt
+    // Protocol seam: SX spaces go through the on-chain backend, everything else
+    // through the off-chain VoteBackend.
+    voteReceipt.value = isSx.value
+      ? await castSxVote(address, selectedChoice.value)
+      : await activeVoteBackend.castVote({
+          vote: {
+            from: address,
+            space: proposal.value.space.id,
+            proposal: proposal.value.id,
+            type: proposal.value.type,
+            choice: encodeChoice(proposal.value.type, selectedChoice.value),
+            reason: reason.value,
+            app: SNAPSHOT_APP_NAME
+          },
+          signTypedData: (typedData) => auth.provider.value.signTypedData({ address, typedData })
+        })
   } catch (e) {
     if (e instanceof KmsNotConfiguredError) {
       // Expected until E-5 lands: AirAccount signing has no backend yet.
@@ -193,6 +271,7 @@ onMounted(() => {
       <div class="titleRow">
         <h1 class="title">{{ proposal.title }}</h1>
         <div class="right">
+          <div v-if="isSx" class="chip">{{ t('sxOnchain') }}</div>
           <div class="chip">{{ proposal.state }}</div>
         </div>
       </div>
