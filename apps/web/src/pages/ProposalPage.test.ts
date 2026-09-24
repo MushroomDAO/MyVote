@@ -7,22 +7,31 @@ import { AppError } from '../lib/errors'
 // Unmount between tests so a previous wrapper cannot react to the shared mocks.
 enableAutoUnmount(afterEach)
 
-const { castVote, fetchProposal, signTypedData, fetchSxProposal, fetchSxVoterVote, sxCastVote } =
-  vi.hoisted(() => ({
-    castVote: vi.fn(),
-    fetchProposal: vi.fn(),
-    signTypedData: vi.fn(),
-    fetchSxProposal: vi.fn(),
-    fetchSxVoterVote: vi.fn(),
-    sxCastVote: vi.fn()
-  }))
+const {
+  castVote,
+  fetchProposal,
+  fetchVoterVote,
+  signTypedData,
+  fetchSxProposal,
+  fetchSxVoterVote,
+  sxCastVote
+} = vi.hoisted(() => ({
+  castVote: vi.fn(),
+  fetchProposal: vi.fn(),
+  fetchVoterVote: vi.fn(),
+  signTypedData: vi.fn(),
+  fetchSxProposal: vi.fn(),
+  fetchSxVoterVote: vi.fn(),
+  sxCastVote: vi.fn()
+}))
 
 vi.mock('../lib/voteBackend', () => ({
   activeVoteBackend: { castVote: (...args: unknown[]) => castVote(...args) }
 }))
 
 vi.mock('../lib/graphql', () => ({
-  fetchProposal: (...args: unknown[]) => fetchProposal(...args)
+  fetchProposal: (...args: unknown[]) => fetchProposal(...args),
+  fetchVoterVote: (...args: unknown[]) => fetchVoterVote(...args)
 }))
 
 // Keep the real buildSxVoteRequest; stub only the network fetch.
@@ -90,7 +99,8 @@ const i18n = createI18n({
       voteSubmitted: 'VOTE_SUBMITTED',
       sxAlreadyVoted: 'SX_ALREADY_VOTED',
       sxViewTx: 'VIEW_TX',
-      sxVotePower: 'VP'
+      sxVotePower: 'VP',
+      offchainAlreadyVoted: 'OFFCHAIN_VOTED'
     }
   }
 })
@@ -156,8 +166,9 @@ async function mountAndVote() {
 }
 
 beforeEach(() => {
-  // Default: the connected account has no indexed on-chain vote.
+  // Default: the connected account has no existing vote on either backend.
   fetchSxVoterVote.mockResolvedValue(null)
+  fetchVoterVote.mockResolvedValue(null)
 })
 
 afterEach(() => {
@@ -259,6 +270,41 @@ describe('ProposalPage error recovery', () => {
 
     expect(fetchProposal).toHaveBeenCalledTimes(2)
     expect(wrapper.text()).toContain('Test')
+  })
+})
+
+describe('ProposalPage existing off-chain vote', () => {
+  const ADDRESS = '0x1111111111111111111111111111111111111111'
+
+  it('shows the note and prefills the saved choice', async () => {
+    authState.providerId = 'wallet'
+    authState.user = { address: ADDRESS }
+    fetchProposal.mockResolvedValue({ proposal: proposal() })
+    fetchVoterVote.mockResolvedValue({ id: '0xv', choice: 2 })
+
+    const wrapper = mount(ProposalPage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(fetchVoterVote).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ proposalId: '0xprop', voter: ADDRESS })
+    )
+    expect(wrapper.text()).toContain('OFFCHAIN_VOTED')
+    // The saved 1-based index is selected (second button).
+    expect(wrapper.findAll('.choiceButton')[1]!.attributes('data-selected')).toBe('true')
+  })
+
+  it('leaves the ballot empty when the account has not voted', async () => {
+    authState.providerId = 'wallet'
+    authState.user = { address: ADDRESS }
+    fetchProposal.mockResolvedValue({ proposal: proposal() })
+    fetchVoterVote.mockResolvedValue(null)
+
+    const wrapper = mount(ProposalPage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.find('.sxVoteNote').exists()).toBe(false)
+    expect(wrapper.findAll('.choiceButton')[1]!.attributes('data-selected')).not.toBe('true')
   })
 })
 
