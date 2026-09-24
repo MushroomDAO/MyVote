@@ -24,6 +24,62 @@ const submitting = ref(false)
 const submitError = ref<string | null>(null)
 const successUrl = ref<string | null>(null)
 
+// --- Email verification code (M6-3) ---
+const emailCode = ref('')
+const codeState = ref<'idle' | 'sending' | 'sent' | 'unavailable' | 'error'>('idle')
+const codeMessage = ref<string | null>(null)
+
+/** Localizes the API's stable verification codes. */
+function submitErrorMessage(code: string): string {
+  if (code === 'email_code_missing') return t('emailCodeRequired')
+  if (code.startsWith('email_code_')) return t('emailCodeInvalid')
+  return code
+}
+
+function onEmailChange() {
+  // A code is bound to one address; a change invalidates what is on screen.
+  codeState.value = 'idle'
+  codeMessage.value = null
+  emailCode.value = ''
+}
+
+async function sendCode() {
+  if (!isEmailValid.value) {
+    codeState.value = 'error'
+    codeMessage.value = t('emailInvalid')
+    return
+  }
+  codeState.value = 'sending'
+  codeMessage.value = null
+  try {
+    const res = await fetch('/api/email-code', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: email.value.trim().toLowerCase() })
+    })
+    const data = (await res.json()) as { ok?: boolean; error?: string }
+    if (res.ok && data.ok) {
+      codeState.value = 'sent'
+      codeMessage.value = t('emailCodeSent')
+      return
+    }
+    const code = data.error ?? ''
+    if (code === 'email_verification_unavailable') {
+      codeState.value = 'unavailable'
+      codeMessage.value = t('emailCodeUnavailable')
+    } else {
+      codeState.value = 'error'
+      codeMessage.value =
+        code === 'email_send_failed' || code === 'email_send_unknown'
+          ? t('emailCodeSendFailed')
+          : code || t('emailCodeSendFailed')
+    }
+  } catch (e) {
+    codeState.value = 'error'
+    codeMessage.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
 const nameLower = computed(() => name.value.toLowerCase().trim())
 const isValidName = computed(() => isValidSubdomain(nameLower.value))
 const isEmailValid = computed(() => isValidEmail(email.value))
@@ -122,6 +178,7 @@ async function onSubmit() {
         spaceId: spaceId.value.trim(),
         description: description.value.trim(),
         email: email.value.trim().toLowerCase(),
+        ...(emailCode.value.trim() ? { emailCode: emailCode.value.trim() } : {}),
         ...(ownershipProof.value
           ? {
               adminAddress: ownershipProof.value.address,
@@ -133,7 +190,7 @@ async function onSubmit() {
     })
     const data = await res.json() as { success?: boolean; url?: string; error?: string }
     if (!res.ok || data.error) {
-      submitError.value = data.error ?? t('registerError')
+      submitError.value = data.error ? submitErrorMessage(data.error) : t('registerError')
     } else {
       successUrl.value = data.url ?? null
     }
@@ -211,15 +268,38 @@ async function onSubmit() {
 
       <div class="field">
         <label class="label" for="email">{{ t('contactEmail') }}</label>
-        <input
-          id="email"
-          v-model="email"
-          class="inputSolo"
-          type="email"
-          autocomplete="email"
-          placeholder="you@example.com"
-        />
+        <div class="emailRow">
+          <input
+            id="email"
+            v-model="email"
+            class="inputSolo"
+            type="email"
+            autocomplete="email"
+            placeholder="you@example.com"
+            @input="onEmailChange"
+          />
+          <button
+            class="codeBtn"
+            type="button"
+            :disabled="codeState === 'sending' || !isEmailValid"
+            @click="sendCode"
+          >
+            {{ codeState === 'sending' ? t('loading') : t('sendCode') }}
+          </button>
+        </div>
         <div class="hint">{{ t('contactEmailHint') }}</div>
+        <div v-if="codeMessage" :class="codeState === 'sent' ? 'statusOk' : 'statusErr'">
+          {{ codeMessage }}
+        </div>
+        <input
+          id="emailCode"
+          v-model="emailCode"
+          class="inputSolo codeInput"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          :placeholder="t('emailCodePlaceholder')"
+        />
       </div>
 
       <div class="field">
@@ -296,6 +376,36 @@ async function onSubmit() {
 }
 
 /* Standalone input (no domain suffix) — full radius, unlike .input in .inputRow. */
+.emailRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.emailRow .inputSolo {
+  flex: 1;
+}
+
+.codeBtn {
+  border: 1px solid var(--mv-border-md);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.codeBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.codeInput {
+  margin-top: 8px;
+}
+
 .inputSolo {
   width: 100%;
   box-sizing: border-box;
