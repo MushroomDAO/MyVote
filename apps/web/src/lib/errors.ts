@@ -6,12 +6,35 @@
  * {@link resolveErrorMessage}. `message` stays as a readable fallback (logs,
  * unknown codes, tests).
  */
-export type ErrorCode = 'voteClockSkew' | 'voteRejected'
+export type ErrorCode =
+  | 'voteClockSkew'
+  | 'voteRejected'
+  | 'ssoNotConfigured'
+  | 'ssoExchangeFailed'
+  | 'ssoCodeRejected'
+  | 'ssoVerifyFailed'
+  | 'ssoNoSession'
+  | 'ssoSessionExpired'
+  | 'accountMismatch'
+  | 'walletSwitchBlocked'
 
 /** i18n key for each code. Keep in sync with apps/web/src/i18n.ts. */
 const ERROR_KEYS: Record<ErrorCode, string> = {
   voteClockSkew: 'errVoteClockSkew',
-  voteRejected: 'errVoteRejected'
+  voteRejected: 'errVoteRejected',
+  ssoNotConfigured: 'errSsoNotConfigured',
+  ssoExchangeFailed: 'errSsoExchangeFailed',
+  ssoCodeRejected: 'errSsoCodeRejected',
+  ssoVerifyFailed: 'errSsoVerifyFailed',
+  ssoNoSession: 'errSsoNoSession',
+  ssoSessionExpired: 'errSsoSessionExpired',
+  accountMismatch: 'errAccountMismatch',
+  walletSwitchBlocked: 'errWalletSwitchBlocked'
+}
+
+/** i18n key for a code, if one is registered. */
+export function errorKey(code: ErrorCode): string | undefined {
+  return ERROR_KEYS[code]
 }
 
 export type ErrorParams = Record<string, string | number>

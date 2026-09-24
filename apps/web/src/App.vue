@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale, type AppLocale } from './i18n'
 import { useAuth } from './auth/useAuth'
+import { errorKey } from './lib/errors'
 import { resolvedBranding as branding, tenant } from './tenant'
 
 const { t, locale } = useI18n()
@@ -17,6 +18,13 @@ const emailInput = ref('')
 const needsEmail = computed(
   () => auth.activeProviderId.value === 'email' && !auth.isConnected.value
 )
+
+/** Localized message when the failure carries a code; raw text otherwise. */
+const errorText = computed(() => {
+  const code = auth.errorCode.value
+  const key = code ? errorKey(code) : undefined
+  return key ? t(key) : (auth.error.value ?? '')
+})
 
 onMounted(() => {
   // Consumes a `?code=` from cos72, or revalidates a stored token. Silent by design.
@@ -96,7 +104,7 @@ async function onConnectClick() {
     </header>
 
     <div v-if="auth.error" class="error">
-      {{ auth.error }}
+      {{ errorText }}
     </div>
 
     <RouterView />

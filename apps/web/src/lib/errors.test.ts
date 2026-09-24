@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { AppError, resolveErrorMessage, type TranslateFn } from './errors'
+import { AppError, errorKey, resolveErrorMessage, type TranslateFn } from './errors'
 
 const dict: Record<string, string> = {
   errVoteClockSkew: 'clock skew, check your system time',
@@ -13,6 +13,14 @@ const t: TranslateFn = (key, params) => {
   if (!template) return key
   return template.replace(/\{(\w+)\}/g, (_, name: string) => String(params?.[name] ?? ''))
 }
+
+describe('errorKey', () => {
+  it('maps vote and auth codes to their i18n keys', () => {
+    expect(errorKey('voteRejected')).toBe('errVoteRejected')
+    expect(errorKey('ssoCodeRejected')).toBe('errSsoCodeRejected')
+    expect(errorKey('walletSwitchBlocked')).toBe('errWalletSwitchBlocked')
+  })
+})
 
 describe('AppError', () => {
   it('carries the code, message and params', () => {

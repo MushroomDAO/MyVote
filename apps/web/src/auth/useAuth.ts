@@ -10,6 +10,7 @@ import {
 import { createAirAccountProvider } from './airAccountProvider'
 import { createEmailProvider } from './emailProvider'
 import { createWalletProvider } from './walletProvider'
+import { AppError, type ErrorCode } from '../lib/errors'
 
 /**
  * The live AirAccount bridge (cos72 SSO + KMS signing). Exported so the shell
@@ -48,7 +49,17 @@ function defaultProviderId(): AuthProviderId {
 const activeProviderId = ref<AuthProviderId>(defaultProviderId())
 const user = ref<AuthUser | null>(null)
 const error = ref<string | null>(null)
+/**
+ * Machine-readable code for {@link error}, when the failure carries one. Lets
+ * the shell render the message in the active locale instead of the raw string.
+ */
+const errorCode = ref<ErrorCode | null>(null)
 const ssoSessionActive = ref<boolean>(detectSsoSession())
+
+/** Pulls a stable error code off a thrown value, if it has one. */
+function codeOf(e: unknown): ErrorCode | null {
+  return e instanceof AppError ? e.code : null
+}
 
 export function useAuth() {
   const provider = computed(() => providersById[activeProviderId.value])
@@ -61,6 +72,7 @@ export function useAuth() {
     if (activeProviderId.value === id) return
     if (id === 'wallet' && walletDisabled.value) {
       error.value = 'AirAccount 登录模式下不可切换到钱包'
+      errorCode.value = 'walletSwitchBlocked'
       return
     }
     await disconnect()
@@ -69,6 +81,7 @@ export function useAuth() {
 
   async function connect(params?: AuthConnectParams) {
     error.value = null
+    errorCode.value = null
     try {
       user.value = await provider.value.connect(params)
     } catch (e) {
@@ -79,6 +92,7 @@ export function useAuth() {
         return
       }
       error.value = e instanceof Error ? e.message : String(e)
+      errorCode.value = codeOf(e)
       user.value = null
       throw e
     } finally {
@@ -88,6 +102,7 @@ export function useAuth() {
 
   async function disconnect() {
     error.value = null
+    errorCode.value = null
     await provider.value.disconnect()
     user.value = null
     ssoSessionActive.value = detectSsoSession()
@@ -113,6 +128,7 @@ export function useAuth() {
       // disabled is exactly the dead end we're avoiding.
       if (e instanceof SsoCodeRejectedError) {
         error.value = `${e.message}(请重新登录)`
+        errorCode.value = codeOf(e)
       }
       // Anything else (no session yet, network blip) stays quiet: not user-initiated.
     } finally {
@@ -136,6 +152,7 @@ export function useAuth() {
     } catch (e) {
       user.value = null
       error.value = e instanceof Error ? e.message : String(e)
+      errorCode.value = codeOf(e)
       throw e
     } finally {
       ssoSessionActive.value = detectSsoSession()
@@ -153,6 +170,7 @@ export function useAuth() {
     provider,
     user,
     error,
+    errorCode,
     isConnected,
     ssoOnly: SSO_ONLY,
     walletDisabled,
