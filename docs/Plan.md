@@ -66,8 +66,14 @@
       能过端点门，但 `/kms/SignTypedData` 仍要求 **agent JWT 或 challenge-bound WebAuthn**；
       `/kms/create-agent-key` 同为 WebAuthn 门控。故真机签名待 cos72 签发 agent JWT（或浏览器
       passkey ceremony），SSO token 正是这个凭据。_
-- [ ] **E-5（真机签名）**：用 cos72 的 agent JWT 或浏览器 passkey，在 kms.aastar.io 上签出
-      一份 EIP-712 签名并验签。
+- [x] **E-5（真机签名）**：2026-09 用 KMS e2e API key + SDK 的 `P256PasskeySigner`
+      在 `kms.aastar.io` 创建了绑定软件 passkey 的 key、经 WebAuthn ceremony 铸出
+      **agent JWT**，再用**我们的** `createHttpKmsSigner` 成功签出 EIP-712 签名（65 字节，
+      `verifyTypedData` 通过）。复现：`src/auth/kms.live.test.ts`（`KMS_LIVE=1`）。
+      _关键发现：agent 凭据按派生路径限定（实测 `m/44'/60'/0'/1/0`），传 KMS 默认的
+      `m/44'/60'/0'/0/0` 会被拒；故会话除 token 外还要带 `hdPath`，signer 已支持按请求传入。_
+- [ ] **E-5（生产接线）**：cos72 在 SSO 交换结果里返回 agent JWT 及其 `hdPath`；MyVote
+      侧已就绪（`KmsSignContext.token` + `hdPath`）。
 - [ ] **cos72**：SSO 授权落地页（`/sso/authorize` 前的第一方页面）上线；`VITE_COS72_AUTHORIZE_URL` 指向它。
 - [ ] cos72 refresh endpoint 就绪后，把 SSO token 从 `sessionStorage` 迁到内存 + HttpOnly 刷新 Cookie。
 - [ ] E2E：Web2 登录 → 投票全链路。
