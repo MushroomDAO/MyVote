@@ -34,5 +34,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     description: config.description,
     createdAt: config.createdAt,
     domainStatus: config.domainStatus,
+    // Whether the registrant proved control of the space (see lib/ownership.ts).
+    ownership: config.ownership,
   })
 }
