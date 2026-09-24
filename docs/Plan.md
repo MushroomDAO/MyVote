@@ -49,8 +49,8 @@
 
 - [x] 抽出 `VoteBackend` 接口，`snapshotVote.ts` 作为链下默认实现（不改行为）。
 - [x] 读取路径加**过期响应守卫**（请求令牌），修 `SpacePage` / `ProposalPage` / `ExplorePage` 的乱序覆盖竞态（见 `docs/architecture-review.md` 建议 1）。
-- [x] 补读取路径测试：`lib/sx/*`、`lib/cache.ts`、`lib/requestGuard.ts`，以及页面组件的竞态与协议分流。
-      _`lib/graphql.ts` 自身仍无单测（薄封装，由页面测试间接覆盖）。_
+- [x] 补读取路径测试：`lib/graphql.ts`、`lib/sx/*`、`lib/cache.ts`、`lib/requestGuard.ts`，
+      以及页面组件的竞态、协议分流与错误恢复。
 - [x] Explore 缓存 key 按租户（host）隔离；投票后失效：Explore 缓存不含投票数据，暂无必要。
 - [x] 错误信息接入 i18n：投票路径与 auth/SSO 路径均改为稳定错误码
       （`lib/errors.ts` 的 `ErrorCode` / `errorKey`），UI 侧 `resolveErrorMessage` / `App.vue` 翻译。
@@ -110,6 +110,26 @@
 - [x] **注册失败处理**：CF Pages 域名注册失败时**回滚 KV 并返回 502**（不再静默成功）；
       未配置 CF 密钥（预览）记 `domainStatus: 'unmanaged'`，成功记 `'active'`，`/api/status` 暴露该状态。
       本批首次为 `functions/` 建立单测（`functions/api/register.test.ts`，Node 环境）。
+
+### M7 — 稳健性与测试补强（自主迭代）
+
+**目标**：在等待外部依赖（E-5 KMS / M6-3 注册鉴权 / 真机投票）期间，
+把测试覆盖与读取路径健壮性补齐，并修复过程中暴露的真实缺陷。
+
+- [x] 补齐此前零测试的模块：`tenant.ts`、`router.ts`、`pages/RegisterPage.vue`、
+      `auth/useAuth.ts`、`auth/{walletProvider,airAccountProvider,kms}.ts`、
+      `App.vue`、`main.ts`（#36–#40、#44）。
+- [x] 读取路径接入 **AbortController**：`requestGuard` 持有取消信号，
+      `next()` 中止上一个请求，`abort()` 用于卸载且同步失效令牌；
+      `lib/graphql.ts` / `lib/sx/api.ts` 透传 `signal`（且不进入 GraphQL variables），
+      三个页面接线（#41、#42）。
+- [x] 读取失败可重试：`SpacePage` / `ProposalPage` 增加重试按钮；
+      `ExplorePage` 链上列表失败不再静默清空（#43）。
+- [x] 修复 Ref 未解包导致的模板缺陷（#44、#45）：`App.vue` 的全局错误条常显与
+      登录态误判、`SsoCallbackPage` 的空错误块。根因相同——`<script setup>` 只
+      自动解包**顶层**绑定，而模板里访问了 `useAuth()` 返回对象上的 ref；
+      现统一解构为顶层 ref。
+- [ ] 真实 SX 投票 E2E 与注册鉴权仍按 M5 / M6 的阻塞项处理。
 
 ---
 
