@@ -119,9 +119,9 @@ export type HttpKmsOptions = {
   /** KMS base URL, e.g. `https://kms.aastar.io` (no trailing slash). */
   endpoint: string
   /**
-   * Server-side credential sent as `x-api-key`. A browser caller leaves this
-   * unset and passes the per-user SSO token instead: the token identifies the
-   * signing account, while an API key identifies the deployment.
+   * Credential sent as `x-api-key`. It satisfies the endpoint's gate; signing
+   * `/kms/SignTypedData` additionally needs the caller's agent JWT (the SSO
+   * token carried on each request), which names the signing account.
    */
   apiKey?: string
   /** BIP-44 path; defaults to {@link KMS_HD_PATH}. */
@@ -190,10 +190,11 @@ function kmsErrorDetail(payload: unknown, fallback: string): string {
 /**
  * Real E-5 signer: signs through the aastar TEE KMS over HTTP.
  *
- * `signTypedData` uses `/kms/SignTypedData`, which accepts an agent JWT or an
- * API key. `signMessage` uses `/kms/SignHash` with the EIP-191 digest — that
- * endpoint is WebAuthn-gated, so a caller without a bound passkey gets the
- * KMS's own auth error rather than a silent mis-signature.
+ * Live behaviour of kms.aastar.io v0.29.0: `x-api-key` satisfies the endpoint
+ * gate, but `/kms/SignTypedData` then demands an agent JWT or a challenge-bound
+ * WebAuthn assertion. The SSO token carried on each request is the signing
+ * credential; an API key alone answers 400. `signMessage` calls `/kms/SignHash`,
+ * which is WebAuthn-gated the same way.
  */
 export function createHttpKmsSigner(options: HttpKmsOptions): KmsSigner {
   const endpoint = options.endpoint.replace(/\/+$/, '')
