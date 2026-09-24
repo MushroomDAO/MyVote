@@ -58,8 +58,21 @@ apps/web/scripts/deploy-preview.sh [branch]   # 默认 dev
 **production**（Pages → Settings → Environment variables，加密项不在仓库）：
 `CF_API_TOKEN`、`CF_ACCOUNT_ID`、`CF_PAGES_PROJECT`、`CF_ZONE_ID`、`CF_ROOT_DOMAIN`
 
+**注册邮箱验证码（M6-3，可选）**：
+
+| 变量 | 说明 |
+|---|---|
+| `RESEND_API_KEY` | Resend API key。**设置后 `/api/register` 强制要求邮箱验证码**；不设置则保持现有的开发态（记录 `emailVerified: false`）。 |
+| `EMAIL_FROM` | 发件地址，默认 `hello@idoris.ai`（须是 Resend 已验证域名下的地址）。 |
+| `EMAIL_CODE_SECRET` | 只存在服务端的哈希盐；KV 泄露也不会让人反推验证码。建议设置。 |
+
+验证码由 `POST /api/email-code` 发送（6 位、10 分钟有效、最多 5 次尝试、按 IP 与邮箱双限流），
+KV 中只存加盐 SHA-256（`ec:<email>`），明文只出现在邮件里。发送结果区分「Resend 明确拒绝」（可重试，502）
+与「结果未知」（可能已发出，保留验证码并返回 202），见 `src/lib/resend.ts`。
+
 **preview**：只有非敏感的 `CF_ROOT_DOMAIN`、`SNAPSHOT_HUB`。
 > 预览环境**刻意不配置 CF 密钥**：这样预览里的注册请求不会真的去开通 Pages 自定义域名。
+> 预览同样不配 `RESEND_API_KEY`，因此 `/api/email-code` 返回 503，注册流程保持开放。
 
 前端构建期变量（`VITE_*`）见 `apps/web/.env.example`。
 

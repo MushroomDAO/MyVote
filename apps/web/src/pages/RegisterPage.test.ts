@@ -54,6 +54,13 @@ const i18n = createI18n({
       registerSuccess: 'REGISTER_SUCCESS',
       registerSuccessDesc: 'it worked',
       registerSuccessNote: 'DNS_NOTE',
+      sendCode: 'SEND_CODE',
+      emailCodePlaceholder: 'CODE_PH',
+      emailCodeSent: 'CODE_SENT',
+      emailCodeRequired: 'CODE_REQUIRED',
+      emailCodeInvalid: 'CODE_INVALID',
+      emailCodeUnavailable: 'CODE_UNAVAILABLE',
+      emailCodeSendFailed: 'CODE_SEND_FAILED',
       loading: 'LOADING'
     }
   }
@@ -104,6 +111,9 @@ beforeEach(() => {
     if (url.startsWith('/api/check')) {
       return json({ available: true, domain: 'bread.example.com' })
     }
+    if (url.startsWith('/api/email-code')) {
+      return json({ ok: true })
+    }
     return json({ success: true, url: 'https://bread.example.com' })
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -111,6 +121,69 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+describe('RegisterPage email verification', () => {
+  it('sends a code for the typed address and confirms it', async () => {
+    const wrapper = await mountPage()
+    await wrapper.get('#email').setValue('Alice@Example.com')
+    await flushPromises()
+
+    await wrapper.get('.codeBtn').trigger('click')
+    await flushPromises()
+
+    const call = fetchMock.mock.calls.find((c) => String(c[0]) === '/api/email-code')!
+    expect(JSON.parse((call[1] as { body: string }).body)).toEqual({ email: 'alice@example.com' })
+    expect(wrapper.text()).toContain('CODE_SENT')
+  })
+
+  it('keeps the send button disabled until the address is valid', async () => {
+    const wrapper = await mountPage()
+    expect(wrapper.get('.codeBtn').attributes('disabled')).toBeDefined()
+
+    await wrapper.get('#email').setValue('alice@example.com')
+    await flushPromises()
+    expect(wrapper.get('.codeBtn').attributes('disabled')).toBeUndefined()
+  })
+
+  it('reports an unavailable mail service', async () => {
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = String(input)
+      if (url.startsWith('/api/check')) return json({ available: true, domain: 'bread.example.com' })
+      if (url.startsWith('/api/email-code')) return json({ error: 'email_verification_unavailable' }, false)
+      return json({ success: true })
+    })
+    const wrapper = await mountPage()
+    await wrapper.get('#email').setValue('alice@example.com')
+    await wrapper.get('.codeBtn').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('CODE_UNAVAILABLE')
+  })
+
+  it('includes the code in the registration payload', async () => {
+    const wrapper = await mountPage()
+    await fillReady(wrapper)
+    await wrapper.get('#emailCode').setValue('123456')
+    await wrapper.get('.submitBtn').trigger('click')
+    await flushPromises()
+
+    expect(lastBody().emailCode).toBe('123456')
+  })
+
+  it('translates a rejected code on submit', async () => {
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = String(input)
+      if (url.startsWith('/api/check')) return json({ available: true, domain: 'bread.example.com' })
+      return json({ error: 'email_code_mismatch' }, false)
+    })
+    const wrapper = await mountPage()
+    await fillReady(wrapper)
+    await wrapper.get('.submitBtn').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('CODE_INVALID')
+  })
 })
 
 describe('RegisterPage name availability', () => {
