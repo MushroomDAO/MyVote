@@ -1,0 +1,53 @@
+# Typecheck + unit tests + production build for the web app.
+#
+# This is the same gate the pre-PR check expects a contributor to have run by
+# hand (see docs/development-loop.md). It deliberately does NOT deploy: preview
+# publishing stays an explicit step via apps/web/scripts/deploy-preview.sh.
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+# A superseded run on the same ref is pointless once a newer commit lands.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: web (typecheck / test / build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          # Paths for `uses` steps are repo-root relative, not the job working-directory.
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (vue-tsc)
+        run: pnpm run typecheck
+
+      - name: Unit tests (vitest)
+        run: pnpm run test
+
+      - name: Production build
+        run: pnpm run build
