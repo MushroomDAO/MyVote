@@ -77,9 +77,11 @@ function request(): SxVoteRequest {
 const PROVIDER = { __fakeProvider: true }
 
 describe('createSnapshotXEvmBackend', () => {
-  it('signs and submits through the injected sx client', async () => {
-    const vote = vi.fn().mockResolvedValue({ id: 'sx-receipt' })
-    const client = { vote } as unknown as SxClient
+  it('signs, then relays the envelope to the relayer', async () => {
+    const envelope = { signatureData: { signature: '0xsig' }, data: request() }
+    const vote = vi.fn().mockResolvedValue(envelope)
+    const send = vi.fn().mockResolvedValue({ id: 'sx-receipt' })
+    const client = { vote, send } as unknown as SxClient
     const loadSxClient = vi.fn().mockResolvedValue(client)
     const backend = createSnapshotXEvmBackend({
       config: { network: 'optimism', provider: PROVIDER },
@@ -89,7 +91,9 @@ describe('createSnapshotXEvmBackend', () => {
 
     const receipt = await backend.castVote(request(), signer)
 
+    // The relayer result is the receipt — not the envelope `vote()` returned.
     expect(receipt).toEqual({ id: 'sx-receipt' })
+    expect(send).toHaveBeenCalledWith(envelope)
     expect(backend.id).toBe('snapshot-x-evm')
     expect(loadSxClient).toHaveBeenCalledWith({
       network: 'optimism',
@@ -105,9 +109,38 @@ describe('createSnapshotXEvmBackend', () => {
     expect(arg.signer).toBe(signer)
   })
 
+  it('does not relay when signing fails', async () => {
+    const vote = vi.fn().mockRejectedValue(new Error('user rejected'))
+    const send = vi.fn()
+    const backend = createSnapshotXEvmBackend({
+      config: { network: 'optimism', provider: PROVIDER },
+      loadSxClient: vi.fn().mockResolvedValue({ vote, send } as unknown as SxClient)
+    })
+
+    await expect(
+      backend.castVote(request(), createEthersCompatSigner('0xabc', vi.fn()))
+    ).rejects.toThrow('user rejected')
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('fails loudly when the relayer returns no result', async () => {
+    const backend = createSnapshotXEvmBackend({
+      config: { network: 'optimism', provider: PROVIDER },
+      loadSxClient: vi.fn().mockResolvedValue({
+        vote: vi.fn().mockResolvedValue({}),
+        send: vi.fn().mockResolvedValue(undefined)
+      } as unknown as SxClient)
+    })
+
+    await expect(
+      backend.castVote(request(), createEthersCompatSigner('0xabc', vi.fn()))
+    ).rejects.toThrow(/relayer returned no result/)
+  })
+
   it('loads the SDK at most once across concurrent votes', async () => {
     const loadSxClient = vi.fn().mockResolvedValue({
-      vote: vi.fn().mockResolvedValue({})
+      vote: vi.fn().mockResolvedValue({}),
+      send: vi.fn().mockResolvedValue({})
     } as unknown as SxClient)
     const backend = createSnapshotXEvmBackend({
       config: { network: 'base', provider: PROVIDER },
@@ -122,7 +155,8 @@ describe('createSnapshotXEvmBackend', () => {
 
   it('honours custom Mana and whitelist URLs', async () => {
     const loadSxClient = vi.fn().mockResolvedValue({
-      vote: vi.fn().mockResolvedValue({})
+      vote: vi.fn().mockResolvedValue({}),
+      send: vi.fn().mockResolvedValue({})
     } as unknown as SxClient)
     const backend = createSnapshotXEvmBackend({
       config: {

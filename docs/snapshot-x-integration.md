@@ -20,7 +20,7 @@ MyVote **默认走经典链下 Snapshot**（Hub GraphQL + EIP-712），**可选*
 
 | 文件 | 职责 |
 |---|---|
-| `lib/sx/backend.ts` | 封装 sx.js EVM 签名客户端；**动态 `import('@snapshot-labs/sx')`**（代码分割）；官方 Mana/whitelist 默认值；`createEthersCompatSigner` 把 viem 形状签名桥接为 ethers v5 `_signTypedData` |
+| `lib/sx/backend.ts` | 封装 sx.js EVM 签名客户端；**动态 `import('@snapshot-labs/sx')`**（代码分割）；官方 Mana/whitelist 默认值；`createEthersCompatSigner` 把 viem 形状签名桥接为 ethers v5 `_signTypedData`；`castVote` 走 `vote()` + `send()` 两步 |
 | `lib/sx/provider.ts` | 把注入的 EIP-1193（`window.ethereum`）包装成 sx.js 需要的 ethers Provider 形状；`createSxBackendFromEip1193` 组合 |
 | `lib/sx/api.ts` | 索引器读路径：space / proposals / proposal+space / spaces 列表；`zipStrategies`、`toSxSpace`、`toSxProposal`、`buildSxVoteRequest` |
 | `lib/sx/eligibility.ts` | 投票前置校验（closed / not-started / no-authenticator） |
@@ -33,6 +33,7 @@ MyVote **默认走经典链下 Snapshot**（Hub GraphQL + EIP-712），**可选*
 
 - **SDK 体积**：`@snapshot-labs/sx` 是独立 lazy chunk（约 **851 KB** + shutter wasm），**只在实际投 SX 票时加载**；主 chunk 仅 +~9 KB。原因是包的 `exports` 只暴露根入口，无法只取 EVM 客户端。
 - **签名者桥接**：sx.js 调 `signer.getAddress()` 与 `signer._signTypedData(domain, types, message)`；我们提供 `createEthersCompatSigner`，底层仍走应用层 `viem`/KMS。
+- **提交是两步**：sx.js `EvmEthereumSig.vote()` 返回签好名的 `Envelope`，提交动作在另一个方法 `send(envelope)` 上（内部 `POST {manaUrl}/eth_rpc/<chainId>`）。`castVote` 两步都做，且中继没有返回结果时直接报错——只调 `vote()` 会得到一个"看起来成功但没上链"的签名。
 - **provider 的角色**：SX 的**签名（Mana）路径不读 provider**；适配器是为需要链上读取的策略预留的钩子（已读 sx.js 源码确认 `getStrategiesWithParams` 只用 `networkConfig`）。
 - **提案标识**：链下提案 id 全局唯一（哈希）；SX 提案 id 只在 space 内唯一，故路由用 `/proposal/<proposal_id>?space=0x…`。
 - **投票窗口**：SX 持续到 `max_end`（不是 `min_end`），已正确映射为 `maxEnd`。
