@@ -184,6 +184,38 @@ async function castSxVote(address: string, choice: number) {
   )
 }
 
+/** Reads the proposal for the current route. Touches no UI state itself. */
+async function fetchProposalData(signal: AbortSignal) {
+  if (sxSpaceId.value) {
+    const sx = await fetchSxProposal(SX_API_ENDPOINT, `${sxSpaceId.value}/${proposalId.value}`, {
+      signal
+    })
+    return { sx, proposal: sx ? sxToProposal(sx) : null }
+  }
+  const data = await fetchProposal(GRAPHQL_ENDPOINT, { proposalId: proposalId.value, signal })
+  return { sx: null, proposal: data.proposal }
+}
+
+/**
+ * Re-reads the off-chain proposal after a vote so the new tally shows up.
+ * Best-effort and off-chain only: the SX indexer lags the on-chain vote, so a
+ * refresh there would re-show the old numbers.
+ */
+async function refreshOffchainProposal() {
+  if (!proposalId.value || sxSpaceId.value) return
+  const token = guard.next()
+  try {
+    const data = await fetchProposal(GRAPHQL_ENDPOINT, {
+      proposalId: proposalId.value,
+      signal: guard.signal
+    })
+    if (!guard.isCurrent(token) || !data.proposal) return
+    proposal.value = data.proposal
+  } catch {
+    // Keep the proposal already rendered; the vote itself succeeded.
+  }
+}
+
 async function loadProposal() {
   if (!proposalId.value) return
   loading.value = true
@@ -193,24 +225,11 @@ async function loadProposal() {
   selectedChoice.value = null
   reason.value = ''
   const token = guard.next()
-  const signal = guard.signal
   try {
-    if (sxSpaceId.value) {
-      const sx = await fetchSxProposal(
-        SX_API_ENDPOINT,
-        `${sxSpaceId.value}/${proposalId.value}`,
-        { signal }
-      )
-      if (!guard.isCurrent(token)) return
-      sxProposal.value = sx
-      proposal.value = sx ? sxToProposal(sx) : null
-      return
-    }
-
-    sxProposal.value = null
-    const data = await fetchProposal(GRAPHQL_ENDPOINT, { proposalId: proposalId.value, signal })
+    const { sx, proposal: next } = await fetchProposalData(guard.signal)
     if (!guard.isCurrent(token)) return
-    proposal.value = data.proposal
+    sxProposal.value = sx
+    proposal.value = next
   } catch (e) {
     if (!guard.isCurrent(token)) return
     error.value = e instanceof Error ? e.message : String(e)
@@ -272,6 +291,10 @@ async function submitVote() {
           },
           signTypedData: (typedData) => auth.provider.value.signTypedData({ address, typedData })
         })
+
+    // Off-chain tallies update immediately; pull them in behind the receipt.
+    // (refreshOffchainProposal decides whether that applies to this space.)
+    void refreshOffchainProposal()
   } catch (e) {
     if (e instanceof KmsNotConfiguredError) {
       // Expected until E-5 lands: AirAccount signing has no backend yet.
