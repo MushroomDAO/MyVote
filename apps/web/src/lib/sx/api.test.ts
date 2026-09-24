@@ -6,6 +6,7 @@ import {
   fetchSxProposal,
   fetchSxProposals,
   fetchSxSpace,
+  fetchSxSpaces,
   SX_PROPOSAL_QUERY,
   SX_PROPOSALS_QUERY,
   SX_SPACE_QUERY,
@@ -200,6 +201,20 @@ describe('fetchers', () => {
     expect(body.variables).toEqual({ space: SPACE_WIRE.id, first: 5, skip: 10 })
   })
 
+  it('fetchSxSpaces maps a list and passes pagination', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ data: { spaces: [SPACE_WIRE] } }))
+    const spaces = await fetchSxSpaces(
+      'https://api.example',
+      { first: 3, skip: 6 },
+      fetchImpl as unknown as typeof fetch
+    )
+
+    expect(spaces).toHaveLength(1)
+    expect(spaces[0]!.name).toBe('Ryu0x167 Space Command')
+    const body = JSON.parse((fetchImpl.mock.lastCall![1] as RequestInit).body as string)
+    expect(body.variables).toEqual({ first: 3, skip: 6 })
+  })
+
   it('fetchSxProposal targets the single-proposal query', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ data: { proposal: PROPOSAL_WIRE } }))
     const proposal = await fetchSxProposal(
@@ -223,6 +238,9 @@ describe.skipIf(!process.env.SX_LIVE)('live indexer (SX_LIVE=1)', () => {
   it(
     'reads a real Optimism SX space, its proposals, and one proposal with its space',
     async () => {
+      const listed = await fetchSxSpaces(SX_API_DEFAULT, { first: 3 })
+      expect(listed.length).toBeGreaterThan(0)
+
       const space = await fetchSxSpace(SX_API_DEFAULT, LIVE_SPACE)
       expect(space?.authenticators.length).toBeGreaterThan(0)
 

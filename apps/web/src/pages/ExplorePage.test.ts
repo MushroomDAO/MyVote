@@ -2,11 +2,18 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const { fetchSpaces } = vi.hoisted(() => ({ fetchSpaces: vi.fn() }))
+const { fetchSpaces, fetchSxSpaces } = vi.hoisted(() => ({
+  fetchSpaces: vi.fn(),
+  fetchSxSpaces: vi.fn()
+}))
 const { push } = vi.hoisted(() => ({ push: vi.fn() }))
 
 vi.mock('../lib/graphql', () => ({
   fetchSpaces: (...args: unknown[]) => fetchSpaces(...args)
+}))
+
+vi.mock('../lib/sx/api', () => ({
+  fetchSxSpaces: (...args: unknown[]) => fetchSxSpaces(...args)
 }))
 
 // Keep the cache a no-op so tests do not share state.
@@ -39,7 +46,8 @@ const i18n = createI18n({
       cached: 'cached',
       openSxPlaceholder: 'SX address',
       openSxButton: 'Open',
-      openSxInvalid: 'INVALID_SX'
+      openSxInvalid: 'INVALID_SX',
+      onchainSpaces: 'On-chain spaces'
     }
   }
 })
@@ -48,6 +56,7 @@ const SX = '0x03C7431e14F7b759Aa44398AD7901e6053c197Bf'
 
 async function mountExplore() {
   fetchSpaces.mockResolvedValue({ spaces: [] })
+  fetchSxSpaces.mockResolvedValue([])
   const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
   await flushPromises()
   return wrapper
@@ -75,5 +84,17 @@ describe('ExplorePage on-chain entry', () => {
     await wrapper.find('.sxBtn').trigger('click')
 
     expect(push).toHaveBeenCalledWith('/space/' + SX)
+  })
+
+  it('lists recently created on-chain spaces with their network', async () => {
+    fetchSpaces.mockResolvedValue({ spaces: [] })
+    fetchSxSpaces.mockResolvedValue([{ id: SX, name: 'Ryu0x167 Space Command', network: 'optimism' }])
+
+    const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('On-chain spaces')
+    expect(wrapper.text()).toContain('Ryu0x167 Space Command')
+    expect(wrapper.text()).toContain('Optimism')
   })
 })

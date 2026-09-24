@@ -87,7 +87,8 @@ const messages: Record<AppLocale, Record<string, string>> = {
     cached: '缓存',
     openSxPlaceholder: '打开链上空间：粘贴 Snapshot X 空间地址 (0x…)',
     openSxButton: '打开',
-    openSxInvalid: '请输入有效的 Snapshot X 空间地址（0x 开头的 40 位十六进制）'
+    openSxInvalid: '请输入有效的 Snapshot X 空间地址（0x 开头的 40 位十六进制）',
+    onchainSpaces: '链上空间（Snapshot X）'
   },
   en: {
     appTitle: 'MyVote',
@@ -174,7 +175,8 @@ const messages: Record<AppLocale, Record<string, string>> = {
     cached: 'cached',
     openSxPlaceholder: 'Open an on-chain space: paste a Snapshot X address (0x…)',
     openSxButton: 'Open',
-    openSxInvalid: 'Enter a valid Snapshot X space address (0x + 40 hex characters)'
+    openSxInvalid: 'Enter a valid Snapshot X space address (0x + 40 hex characters)',
+    onchainSpaces: 'On-chain spaces (Snapshot X)'
   }
 }
 
