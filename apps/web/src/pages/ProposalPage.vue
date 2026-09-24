@@ -28,6 +28,7 @@ import {
   type SxVote
 } from '../lib/sx/api'
 import { sxVoteBlock, type SxVoteBlock } from '../lib/sx/eligibility'
+import { msUntilWindowChange } from '../lib/sx/voteWindow'
 import { createSxBackendFromEip1193, type Eip1193Provider } from '../lib/sx/provider'
 import { activeVoteBackend } from '../lib/voteBackend'
 import { protocolForSpaceId } from '../lib/voteRouting'
@@ -54,6 +55,8 @@ const isSx = computed(() => sxSpaceId.value !== null)
 const existingSxVote = ref<SxVote | null>(null)
 /** Set right after this session's on-chain vote, before the indexer catches up. */
 const sxVoted = ref(false)
+/** Clock the SX window checks against; the boundary timer updates it. */
+const windowNow = ref(Math.floor(Date.now() / 1000))
 /** The account's current off-chain vote, so the ballot can show/prefill it. */
 const existingOffchainVote = ref<VoterVote | null>(null)
 /** Local pre-flight reason an SX vote cannot go through right now. */
@@ -67,7 +70,7 @@ const sxBlockReason = computed<SxVoteBlock | null>(() => {
       maxEnd: sx.maxEnd,
       hasAuthenticator: (sx.space?.authenticators.length ?? 0) > 0
     },
-    Math.floor(Date.now() / 1000)
+    windowNow.value
   )
 })
 
@@ -75,6 +78,28 @@ const SX_BLOCK_CODES: Record<SxVoteBlock, ErrorCode> = {
   closed: 'sxVoteClosed',
   'not-started': 'sxVoteNotStarted',
   'no-authenticator': 'sxNoAuthenticator'
+}
+
+let windowTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearWindowTimer() {
+  if (windowTimer) {
+    clearTimeout(windowTimer)
+    windowTimer = null
+  }
+}
+
+/** Arms one timer for the next open/close boundary, then re-arms from there. */
+function armWindowTimer() {
+  clearWindowTimer()
+  const sx = sxProposal.value
+  if (!sx) return
+  const delay = msUntilWindowChange(sx.start, sx.maxEnd, windowNow.value)
+  if (delay === null) return
+  windowTimer = setTimeout(() => {
+    windowNow.value = Math.floor(Date.now() / 1000)
+    armWindowTimer()
+  }, delay)
 }
 
 /** Localized reason shown with the disabled submit button when blocked. */
@@ -332,12 +357,15 @@ async function loadProposal() {
   reason.value = ''
   sxVoted.value = false
   existingOffchainVote.value = null
+  clearWindowTimer()
+  windowNow.value = Math.floor(Date.now() / 1000)
   const token = guard.next()
   try {
     const { sx, proposal: next } = await fetchProposalData(guard.signal)
     if (!guard.isCurrent(token)) return
     sxProposal.value = sx
     proposal.value = next
+    armWindowTimer()
     if (sx) void loadExistingSxVote()
     else void loadExistingOffchainVote()
   } catch (e) {
@@ -438,6 +466,7 @@ onMounted(() => {
 onUnmounted(() => {
   guard.abort()
   voteGuard.abort()
+  clearWindowTimer()
 })
 </script>
 

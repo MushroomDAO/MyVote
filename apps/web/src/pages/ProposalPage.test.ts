@@ -176,6 +176,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.resetAllMocks()
+  vi.restoreAllMocks()
   resetRoute()
 })
 
@@ -273,6 +274,31 @@ describe('ProposalPage error recovery', () => {
 
     expect(fetchProposal).toHaveBeenCalledTimes(2)
     expect(wrapper.text()).toContain('Test')
+  })
+})
+
+describe('ProposalPage on-chain window timer', () => {
+  it('arms a timer for the next window boundary', async () => {
+    routeState.params = { id: '12' }
+    routeState.query = { space: SX_SPACE }
+    const start = Math.floor(Date.now() / 1000) + 600
+    fetchSxProposal.mockResolvedValue({
+      ...sxProposal(),
+      state: 'active',
+      start,
+      maxEnd: start + 86400
+    })
+
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout')
+    const wrapper = mount(ProposalPage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    // One timer aimed at `start` (+1s buffer), so the button flips on time.
+    const delays = timeoutSpy.mock.calls.map((call) => call[1])
+    expect(delays).toContain(600 * 1000 + 1000)
+
+    wrapper.unmount()
+    timeoutSpy.mockRestore()
   })
 })
 
