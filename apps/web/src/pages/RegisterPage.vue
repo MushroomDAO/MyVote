@@ -154,7 +154,7 @@ async function onSubmit() {
       <div class="successTitle">{{ t('registerSuccess') }}</div>
       <div class="successDesc">{{ t('registerSuccessDesc') }}</div>
       <a class="successLink" :href="successUrl" target="_blank" rel="noopener">{{ successUrl }}</a>
-      <div class="successNote">DNS 生效可能需要 1–2 分钟，届时刷新即可访问。</div>
+      <div class="successNote">{{ t('registerSuccessNote') }}</div>
     </div>
 
     <div v-else class="card">
