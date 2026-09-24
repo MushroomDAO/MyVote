@@ -144,4 +144,26 @@ describe('createHttpKmsSigner', () => {
     expect(body.Address).toBe('0xaa')
     expect(body.Hash).toBe(eip191Digest('hello'))
   })
+
+  it('lets the request override the derivation path', async () => {
+    // Agent credentials are scoped to one path; the KMS refuses a mismatch.
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ signature: SIGNATURE }))
+    const signer = createHttpKmsSigner({ endpoint: 'https://kms.test', fetchImpl: fetchImpl as never })
+    await signer.signTypedData({ ...request(), hdPath: "m/44'/60'/0'/1/0" })
+    const body = JSON.parse((fetchImpl.mock.calls[0] as [string, { body: string }])[1].body)
+    expect(body.hdPath).toBe("m/44'/60'/0'/1/0")
+  })
+
+  it('passes the derivation path to SignHash when set', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ Signature: '0x' + '22'.repeat(65) }))
+    const signer = createHttpKmsSigner({ endpoint: 'https://kms.test', fetchImpl: fetchImpl as never })
+    await signer.signMessage({
+      aaAddress: '0xaa',
+      token: jwt({ keyId: 'wallet-1:0' }),
+      message: 'hello',
+      hdPath: "m/44'/60'/0'/1/0"
+    })
+    const body = JSON.parse((fetchImpl.mock.calls[0] as [string, { body: string }])[1].body)
+    expect(body.DerivationPath).toBe("m/44'/60'/0'/1/0")
+  })
 })

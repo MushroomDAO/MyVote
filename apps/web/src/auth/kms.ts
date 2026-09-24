@@ -51,6 +51,12 @@ export type KmsSignContext = {
   aaAddress: string
   /** cos72 SSO JWT (audience `myvote`) proving the caller owns `aaAddress`. */
   token: string
+  /**
+   * BIP-44 path to sign on. An agent credential is scoped to its own path
+   * (observed: `m/44'/60'/0'/1/0`) and the KMS refuses a mismatch, so the
+   * session that carries the token carries the path too.
+   */
+  hdPath?: string
 }
 
 export type KmsSignTypedDataRequest = KmsSignContext & {
@@ -124,7 +130,11 @@ export type HttpKmsOptions = {
    * token carried on each request), which names the signing account.
    */
   apiKey?: string
-  /** BIP-44 path; defaults to {@link KMS_HD_PATH}. */
+  /**
+   * Fallback BIP-44 path for callers that do not supply one. A missing path
+   * makes the KMS assume `m/44'/60'/0'/0/0`, which an agent credential does not
+   * match, so agent sessions pass their own path on the request instead.
+   */
   hdPath?: string
   /**
    * Which KMS key signs. Defaults to the `keyId` claim of the caller's SSO
@@ -244,7 +254,7 @@ export function createHttpKmsSigner(options: HttpKmsOptions): KmsSigner {
         'SignTypedData',
         {
           keyId,
-          hdPath: options.hdPath ?? KMS_HD_PATH,
+          hdPath: request.hdPath ?? options.hdPath ?? KMS_HD_PATH,
           domain: request.typedData.domain,
           primaryType: request.typedData.primaryType,
           types,
@@ -266,6 +276,9 @@ export function createHttpKmsSigner(options: HttpKmsOptions): KmsSigner {
         {
           ...(keyId ? { KeyId: keyId } : {}),
           Address: request.aaAddress,
+          ...(request.hdPath ?? options.hdPath
+            ? { DerivationPath: request.hdPath ?? options.hdPath }
+            : {}),
           Hash: eip191Digest(request.message)
         },
         request.token
