@@ -43,7 +43,9 @@ const i18n = createI18n({
       loading: 'Loading…',
       empty: 'No data',
       proposals: 'Proposals',
-      loadMore: 'Load more'
+      loadMore: 'Load more',
+      sxOnchain: 'ONCHAIN',
+      network: 'Network'
     }
   }
 })
@@ -68,7 +70,7 @@ function sxSpace(id: string, name: string) {
     network: 'optimism',
     authenticators: [],
     vpDecimals: 0,
-    proposalCount: 0,
+    proposalCount: 12,
     strategies: []
   }
 }
@@ -133,6 +135,9 @@ describe('SpacePage stale-response guard', () => {
     expect(fetchSxSpace).toHaveBeenCalledTimes(2)
     expect(wrapper.text()).toContain('SX B')
     expect(wrapper.text()).not.toContain('SX A')
+    // On-chain detail: badge + network label + proposal count.
+    expect(wrapper.text()).toContain('ONCHAIN')
+    expect(wrapper.text()).toContain('Optimism')
     // It read on-chain, not from the off-chain Hub.
     expect(fetchSpaceWithProposals).not.toHaveBeenCalled()
   })
