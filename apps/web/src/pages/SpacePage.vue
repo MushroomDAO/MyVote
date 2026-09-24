@@ -32,6 +32,8 @@ const stateOptions: { value: 'all' | SxProposalState; label: string }[] = [
 const space = ref<Space | null>(null)
 const proposals = ref<ProposalListItem[]>([])
 const loading = ref(false)
+/** A list-only reload (filter change) keeps the card and its filters on screen. */
+const listLoading = ref(false)
 const loadingMore = ref(false)
 const error = ref<string | null>(null)
 const hasMore = ref(true)
@@ -60,13 +62,18 @@ function sxListItem(p: SxProposal): ProposalListItem {
   return { id: String(p.proposalId), title: p.title ?? '', created: p.start, state: p.state }
 }
 
-async function loadSpace(skip: number) {
+async function loadSpace(skip: number, keepSpace = false) {
   if (!spaceId.value) return
   if (skip === 0) {
-    loading.value = true
-    space.value = null
-    proposals.value = []
-    sxMeta.value = null
+    if (keepSpace && space.value) {
+      // Filter change: keep the header and filters, reload only the list.
+      listLoading.value = true
+    } else {
+      loading.value = true
+      space.value = null
+      proposals.value = []
+      sxMeta.value = null
+    }
   } else {
     loadingMore.value = true
   }
@@ -124,6 +131,7 @@ async function loadSpace(skip: number) {
   } finally {
     if (guard.isCurrent(token)) {
       loading.value = false
+      listLoading.value = false
       loadingMore.value = false
     }
   }
@@ -155,7 +163,8 @@ watch(spaceId, () => {
 })
 
 watch(stateFilter, () => {
-  void loadSpace(0)
+  // Keep the card and its filters mounted; only the list reloads.
+  void loadSpace(0, true)
 })
 
 onMounted(() => {
@@ -220,7 +229,8 @@ onUnmounted(() => {
           {{ t(option.label) }}
         </button>
       </div>
-      <div v-if="proposals.length === 0" class="muted">
+      <div v-if="listLoading" class="muted listLoading">{{ t('loading') }}</div>
+      <div v-else-if="proposals.length === 0" class="muted">
         {{ stateFilter === 'all' ? t('empty') : t('emptyFiltered') }}
       </div>
       <ul v-else class="list">
@@ -236,7 +246,7 @@ onUnmounted(() => {
         </li>
       </ul>
 
-      <div v-if="proposals.length > 0 && hasMore" class="more">
+      <div v-if="!listLoading && proposals.length > 0 && hasMore" class="more">
         <button class="moreBtn" type="button" :disabled="loadingMore" @click="loadMore">
           {{ loadingMore ? t('loading') : t('loadMore') }}
         </button>

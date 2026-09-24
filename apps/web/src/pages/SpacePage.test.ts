@@ -327,6 +327,33 @@ describe('SpacePage proposal state filter', () => {
     expect(wrapper.text()).toContain('EMPTY_FILTERED')
   })
 
+  it('keeps the card and filters while a filter reload is in flight', async () => {
+    let resolvePage!: (value: unknown) => void
+    fetchSpaceWithProposals
+      .mockResolvedValueOnce(spaceResult('space-a', 'A'))
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolvePage = resolve
+        })
+      )
+    route.params.id = 'space-a'
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    await wrapper.findAll('.filterBtn')[1]!.trigger('click')
+    await nextTick()
+
+    // The card (and its filters) stay; only the list shows loading.
+    expect(wrapper.findAll('.filterBtn')).toHaveLength(3)
+    expect(wrapper.find('.listLoading').exists()).toBe(true)
+
+    resolvePage(spaceResult('space-a', 'A'))
+    await flushPromises()
+
+    expect(wrapper.find('.listLoading').exists()).toBe(false)
+    expect(wrapper.findAll('.filterBtn')).toHaveLength(3)
+  })
+
   it('issues a single reload when navigating away with a filter active', async () => {
     fetchSpaceWithProposals.mockResolvedValue(spaceResult('space-a', 'A'))
     route.params.id = 'space-a'
