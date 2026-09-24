@@ -161,13 +161,17 @@ async function cfApi(token: string, path: string, method: string, body?: unknown
  * the hole (see docs/registration-atomicity.md).
  */
 async function claimName(env: Env, domain: string, token: string): Promise<boolean> {
+  // Tenants registered before the Durable Object rollout live in KV and have no
+  // claim in the object, so the record check runs for every claim: the object
+  // arbitrates concurrent claims, KV answers "was this name published already".
+  const existing = await env.TENANTS_KV.get(domain)
+  if (existing !== null) return false
+
   const registry = env.TENANT_REGISTRY
   if (registry) return claimDomain(registry, domain, token)
 
-  // KV has no compare-and-set: check first so an existing tenant record is not
-  // overwritten by a losing reservation.
-  const existing = await env.TENANTS_KV.get(domain)
-  if (existing !== null) return false
+  // Without the binding: KV has no compare-and-set, so this narrows the race
+  // without closing it.
   return reserveByKv(env.TENANTS_KV, domain, token)
 }
 
