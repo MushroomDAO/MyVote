@@ -143,3 +143,4 @@ Per-host overrides are injected by the edge function — see `docs/M2-multi-tena
 - `docs/architecture-review.md` — repository architecture review / tech debt
 - `docs/development-loop.md` — dev loop + pre-PR check
 - `docs/deployment.md` — deploy runbook (environments, KV namespaces, secrets)
+- `docs/snapshot-x-integration.md` — Snapshot X (on-chain) integration guide
