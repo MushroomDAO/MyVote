@@ -240,16 +240,23 @@ export function buildSxVoteRequest(input: {
   }
 }
 
+/** Shared fetch knobs: injectable transport (tests) + request cancellation. */
+export type SxFetchOptions = {
+  fetchImpl?: typeof fetch
+  signal?: AbortSignal
+}
+
 export async function sxGraphqlRequest<T>(
   endpoint: string,
   query: string,
   variables: Record<string, unknown>,
-  fetchImpl: typeof fetch = fetch
+  options: SxFetchOptions = {}
 ): Promise<T> {
-  const response = await fetchImpl(endpoint, {
+  const response = await (options.fetchImpl ?? fetch)(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ query, variables })
+    body: JSON.stringify({ query, variables }),
+    signal: options.signal
   })
 
   const text = await response.text()
@@ -282,27 +289,26 @@ export async function sxGraphqlRequest<T>(
 export async function fetchSxSpace(
   endpoint: string = SX_API_DEFAULT,
   spaceId: string,
-  fetchImpl: typeof fetch = fetch
+  options: SxFetchOptions = {}
 ): Promise<SxSpace | null> {
   const data = await sxGraphqlRequest<{ space: SxSpaceWire | null }>(
     endpoint,
     SX_SPACE_QUERY,
     { id: spaceId },
-    fetchImpl
+    options
   )
   return data.space ? toSxSpace(data.space) : null
 }
 
 export async function fetchSxSpaces(
   endpoint: string = SX_API_DEFAULT,
-  options: { first?: number; skip?: number } = {},
-  fetchImpl: typeof fetch = fetch
+  options: { first?: number; skip?: number } & SxFetchOptions = {}
 ): Promise<SxSpace[]> {
   const data = await sxGraphqlRequest<{ spaces: SxSpaceWire[] }>(
     endpoint,
     SX_SPACES_QUERY,
     { first: options.first ?? 6, skip: options.skip ?? 0 },
-    fetchImpl
+    options
   )
   return (data.spaces ?? []).map(toSxSpace)
 }
@@ -310,14 +316,13 @@ export async function fetchSxSpaces(
 export async function fetchSxProposals(
   endpoint: string = SX_API_DEFAULT,
   spaceId: string,
-  options: { first?: number; skip?: number } = {},
-  fetchImpl: typeof fetch = fetch
+  options: { first?: number; skip?: number } & SxFetchOptions = {}
 ): Promise<SxProposal[]> {
   const data = await sxGraphqlRequest<{ proposals: SxProposalWire[] }>(
     endpoint,
     SX_PROPOSALS_QUERY,
     { space: spaceId, first: options.first ?? 20, skip: options.skip ?? 0 },
-    fetchImpl
+    options
   )
   return (data.proposals ?? []).map(toSxProposal)
 }
@@ -325,13 +330,13 @@ export async function fetchSxProposals(
 export async function fetchSxProposal(
   endpoint: string = SX_API_DEFAULT,
   proposalId: string,
-  fetchImpl: typeof fetch = fetch
+  options: SxFetchOptions = {}
 ): Promise<SxProposal | null> {
   const data = await sxGraphqlRequest<{ proposal: SxProposalWire | null }>(
     endpoint,
     SX_PROPOSAL_QUERY,
     { id: proposalId },
-    fetchImpl
+    options
   )
   return data.proposal ? toSxProposal(data.proposal) : null
 }
