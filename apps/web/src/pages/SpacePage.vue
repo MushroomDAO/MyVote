@@ -220,7 +220,9 @@ onUnmounted(() => {
           {{ t(option.label) }}
         </button>
       </div>
-      <div v-if="proposals.length === 0" class="muted">{{ t('empty') }}</div>
+      <div v-if="proposals.length === 0" class="muted">
+        {{ stateFilter === 'all' ? t('empty') : t('emptyFiltered') }}
+      </div>
       <ul v-else class="list">
         <li v-for="p in proposals" :key="p.id" class="item">
           <RouterLink class="proposalTitle" :to="proposalLink(p)">

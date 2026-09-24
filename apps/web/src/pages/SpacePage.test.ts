@@ -47,6 +47,7 @@ const i18n = createI18n({
       sxOnchain: 'ONCHAIN',
       network: 'Network',
       retry: 'Retry',
+      emptyFiltered: 'EMPTY_FILTERED',
       filterAll: 'ALL',
       filterActive: 'ACTIVE',
       filterClosed: 'CLOSED'
@@ -309,6 +310,21 @@ describe('SpacePage proposal state filter', () => {
     await nextTick()
     await flushPromises()
     expect((fetchSpaceWithProposals.mock.lastCall![1] as { state?: string }).state).toBeUndefined()
+  })
+
+  it('explains an empty filtered result', async () => {
+    fetchSpaceWithProposals.mockResolvedValue({
+      space: { id: 'space-a', name: 'A' },
+      proposals: []
+    })
+    route.params.id = 'space-a'
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    await wrapper.findAll('.filterBtn')[1]!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('EMPTY_FILTERED')
   })
 
   it('issues a single reload when navigating away with a filter active', async () => {
