@@ -145,7 +145,12 @@ function proposalLink(p: ProposalListItem) {
 }
 
 watch(spaceId, () => {
-  stateFilter.value = 'all'
+  // Resetting the filter already reloads via the stateFilter watcher; calling
+  // here as well would fire the same request twice.
+  if (stateFilter.value !== 'all') {
+    stateFilter.value = 'all'
+    return
+  }
   void loadSpace(0)
 })
 

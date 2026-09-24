@@ -98,6 +98,8 @@ function loadMore() {
 function refresh() {
   cacheDelete(CACHE_KEY)
   void loadSpaces(0, true)
+  // The on-chain card has no refresh of its own; refresh it with this button.
+  void loadSxSpaces(0)
 }
 
 /** Best-effort: a failure here must not take down the off-chain Explore list. */

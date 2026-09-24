@@ -162,28 +162,42 @@ describe('ExplorePage on-chain failure', () => {
 })
 
 describe('ExplorePage read cancellation', () => {
-  it('does not cancel the on-chain list when the off-chain list reloads', async () => {
+  it('refreshes the on-chain list along with the off-chain one', async () => {
+    fetchSpaces.mockResolvedValue({ spaces: [] })
+    fetchSxSpaces.mockResolvedValue([])
+    const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+    expect(fetchSxSpaces).toHaveBeenCalledTimes(1)
+
+    await wrapper.find('.refreshBtn').trigger('click')
+    await flushPromises()
+
+    expect(fetchSxSpaces).toHaveBeenCalledTimes(2)
+    expect(fetchSxSpaces.mock.lastCall![1]).toMatchObject({ skip: 0 })
+  })
+
+  it('keeps the on-chain read alive across off-chain pagination', async () => {
     let resolveSx!: (value: unknown) => void
     fetchSxSpaces.mockReturnValueOnce(
       new Promise((resolve) => {
         resolveSx = resolve
       })
     )
-    fetchSpaces.mockResolvedValue({ spaces: [] })
+    // A full lookahead page, so the off-chain Load-more button shows.
+    fetchSpaces.mockResolvedValue({
+      spaces: Array.from({ length: 31 }, (_, i) => ({ id: 's' + i, name: 'S' + i }))
+    })
 
     const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
     await flushPromises()
 
     const sxSignal = (fetchSxSpaces.mock.calls[0]![1] as { signal: AbortSignal }).signal
-    const offchainSignal = (fetchSpaces.mock.calls[0]![1] as { signal: AbortSignal }).signal
     expect(sxSignal.aborted).toBe(false)
 
-    await wrapper.find('.refreshBtn').trigger('click')
+    await wrapper.get('.moreBtn').trigger('click')
     await flushPromises()
 
-    // The refresh supersedes the off-chain read only — the on-chain list has
-    // its own guard, so it keeps loading.
-    expect(offchainSignal.aborted).toBe(true)
+    // Off-chain pagination uses the off-chain guard, not the on-chain one.
     expect(sxSignal.aborted).toBe(false)
 
     resolveSx([{ id: SX, name: 'N', network: 'optimism' }])

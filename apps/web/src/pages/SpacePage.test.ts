@@ -310,6 +310,24 @@ describe('SpacePage proposal state filter', () => {
     await flushPromises()
     expect((fetchSpaceWithProposals.mock.lastCall![1] as { state?: string }).state).toBeUndefined()
   })
+
+  it('issues a single reload when navigating away with a filter active', async () => {
+    fetchSpaceWithProposals.mockResolvedValue(spaceResult('space-a', 'A'))
+    route.params.id = 'space-a'
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    await wrapper.findAll('.filterBtn')[2]!.trigger('click')
+    await flushPromises()
+    const before = fetchSpaceWithProposals.mock.calls.length
+
+    route.params.id = 'space-b'
+    await nextTick()
+    await flushPromises()
+
+    // Resetting the filter triggers the reload; a second call would duplicate it.
+    expect(fetchSpaceWithProposals.mock.calls.length).toBe(before + 1)
+  })
 })
 
 describe('SpacePage error recovery', () => {
