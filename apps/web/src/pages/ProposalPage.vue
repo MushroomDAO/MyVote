@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { marked } from 'marked'
@@ -193,11 +193,13 @@ async function loadProposal() {
   selectedChoice.value = null
   reason.value = ''
   const token = guard.next()
+  const signal = guard.signal
   try {
     if (sxSpaceId.value) {
       const sx = await fetchSxProposal(
         SX_API_ENDPOINT,
-        `${sxSpaceId.value}/${proposalId.value}`
+        `${sxSpaceId.value}/${proposalId.value}`,
+        { signal }
       )
       if (!guard.isCurrent(token)) return
       sxProposal.value = sx
@@ -206,7 +208,7 @@ async function loadProposal() {
     }
 
     sxProposal.value = null
-    const data = await fetchProposal(GRAPHQL_ENDPOINT, { proposalId: proposalId.value })
+    const data = await fetchProposal(GRAPHQL_ENDPOINT, { proposalId: proposalId.value, signal })
     if (!guard.isCurrent(token)) return
     proposal.value = data.proposal
   } catch (e) {
@@ -293,6 +295,10 @@ watch(proposalId, () => {
 
 onMounted(() => {
   void loadProposal()
+})
+
+onUnmounted(() => {
+  guard.abort()
 })
 </script>
 

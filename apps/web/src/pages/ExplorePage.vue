@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -19,6 +19,9 @@ const PAGE_SIZE = 30
 const CACHE_KEY = scopedCacheKey('explore:spaces')
 
 const guard = createRequestGuard()
+// The on-chain list loads in parallel and must not be cancelled by a paginated
+// off-chain load, so it gets its own guard.
+const sxGuard = createRequestGuard()
 
 // Snapshot X spaces are contracts, not ENS names, so they are not in the Hub
 // listing above. Let users open one directly by address.
@@ -55,8 +58,9 @@ async function loadSpaces(skip: number, forceRefresh = false) {
   }
   error.value = null
   const token = guard.next()
+  const signal = guard.signal
   try {
-    const data = await fetchSpaces(GRAPHQL_ENDPOINT, { first: PAGE_SIZE, skip })
+    const data = await fetchSpaces(GRAPHQL_ENDPOINT, { first: PAGE_SIZE, skip, signal })
     if (!guard.isCurrent(token)) return
     const newItems = data.spaces
     if (skip === 0) {
@@ -89,12 +93,13 @@ function refresh() {
 /** Best-effort: a failure here must not take down the off-chain Explore list. */
 async function loadSxSpaces() {
   sxLoading.value = true
+  const token = sxGuard.next()
   try {
-    sxSpaces.value = await fetchSxSpaces(SX_API_ENDPOINT, { first: 6 })
+    sxSpaces.value = await fetchSxSpaces(SX_API_ENDPOINT, { first: 6, signal: sxGuard.signal })
   } catch {
-    sxSpaces.value = []
+    if (sxGuard.isCurrent(token)) sxSpaces.value = []
   } finally {
-    sxLoading.value = false
+    if (sxGuard.isCurrent(token)) sxLoading.value = false
   }
 }
 
@@ -111,6 +116,13 @@ function openSxSpace() {
 onMounted(() => {
   void loadSpaces(0)
   void loadSxSpaces()
+})
+
+// Stop in-flight reads on navigation; the tokens flip stale so their catch
+// blocks do not render an AbortError on a dead component.
+onUnmounted(() => {
+  guard.abort()
+  sxGuard.abort()
 })
 </script>
 

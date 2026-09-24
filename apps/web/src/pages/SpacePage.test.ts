@@ -142,3 +142,57 @@ describe('SpacePage stale-response guard', () => {
     expect(fetchSpaceWithProposals).not.toHaveBeenCalled()
   })
 })
+describe('SpacePage read cancellation', () => {
+  it('aborts the superseded request when the space changes', async () => {
+    const stale = deferred()
+    fetchSpaceWithProposals
+      .mockReturnValueOnce(stale.promise)
+      .mockResolvedValueOnce(spaceResult('space-b', 'Space B'))
+
+    route.params.id = 'space-a'
+    mount(SpacePage, { global: { plugins: [i18n] } })
+    await nextTick()
+
+    const { signal } = fetchSpaceWithProposals.mock.calls[0]![1] as { signal: AbortSignal }
+    expect(signal.aborted).toBe(false)
+
+    route.params.id = 'space-b'
+    await nextTick()
+
+    expect(signal.aborted).toBe(true)
+    stale.resolve(spaceResult('space-a', 'Space A'))
+    await flushPromises()
+  })
+
+  it('shares one signal between the concurrent SX reads', async () => {
+    const SX_A = '0x1111111111111111111111111111111111111111'
+    fetchSxSpace.mockResolvedValue(sxSpace(SX_A, 'SX A'))
+    fetchSxProposals.mockResolvedValue([])
+    route.params.id = SX_A
+    mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    const spaceOptions = fetchSxSpace.mock.calls[0]![2] as { signal: AbortSignal }
+    const proposalOptions = fetchSxProposals.mock.calls[0]![2] as { signal: AbortSignal }
+    expect(spaceOptions.signal).toBeInstanceOf(AbortSignal)
+    expect(proposalOptions.signal).toBe(spaceOptions.signal)
+    expect(spaceOptions.signal.aborted).toBe(false)
+  })
+
+  it('aborts the in-flight read on unmount', async () => {
+    const pending = deferred()
+    fetchSpaceWithProposals.mockReturnValueOnce(pending.promise)
+    route.params.id = 'space-a'
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await nextTick()
+
+    const { signal } = fetchSpaceWithProposals.mock.calls[0]![1] as { signal: AbortSignal }
+    expect(signal.aborted).toBe(false)
+
+    wrapper.unmount()
+
+    expect(signal.aborted).toBe(true)
+    pending.resolve(spaceResult('space-a', 'Space A'))
+    await flushPromises()
+  })
+})

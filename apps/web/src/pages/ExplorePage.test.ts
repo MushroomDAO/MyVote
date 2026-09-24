@@ -66,6 +66,52 @@ afterEach(() => {
   vi.resetAllMocks()
 })
 
+describe('ExplorePage read cancellation', () => {
+  it('does not cancel the on-chain list when the off-chain list reloads', async () => {
+    let resolveSx!: (value: unknown) => void
+    fetchSxSpaces.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSx = resolve
+      })
+    )
+    fetchSpaces.mockResolvedValue({ spaces: [] })
+
+    const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    const sxSignal = (fetchSxSpaces.mock.calls[0]![1] as { signal: AbortSignal }).signal
+    const offchainSignal = (fetchSpaces.mock.calls[0]![1] as { signal: AbortSignal }).signal
+    expect(sxSignal.aborted).toBe(false)
+
+    await wrapper.find('.refreshBtn').trigger('click')
+    await flushPromises()
+
+    // The refresh supersedes the off-chain read only — the on-chain list has
+    // its own guard, so it keeps loading.
+    expect(offchainSignal.aborted).toBe(true)
+    expect(sxSignal.aborted).toBe(false)
+
+    resolveSx([{ id: SX, name: 'N', network: 'optimism' }])
+    await flushPromises()
+  })
+
+  it('aborts both in-flight reads on unmount', async () => {
+    fetchSpaces.mockReturnValueOnce(new Promise(() => {}))
+    fetchSxSpaces.mockReturnValueOnce(new Promise(() => {}))
+
+    const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    const offchainSignal = (fetchSpaces.mock.calls[0]![1] as { signal: AbortSignal }).signal
+    const sxSignal = (fetchSxSpaces.mock.calls[0]![1] as { signal: AbortSignal }).signal
+
+    wrapper.unmount()
+
+    expect(offchainSignal.aborted).toBe(true)
+    expect(sxSignal.aborted).toBe(true)
+  })
+})
+
 describe('ExplorePage on-chain entry', () => {
   it('rejects a non-SX address and does not navigate', async () => {
     const wrapper = await mountExplore()

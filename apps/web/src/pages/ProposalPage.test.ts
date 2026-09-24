@@ -203,7 +203,9 @@ describe('ProposalPage Snapshot X', () => {
     expect(wrapper.text()).toContain('ONCHAIN')
     // Results render from the indexed scores (3 / 3 = 100%).
     expect(wrapper.text()).toContain('100.0%')
-    expect(fetchSxProposal).toHaveBeenCalledWith(expect.any(String), SX_SPACE + '/12')
+    expect(fetchSxProposal).toHaveBeenCalledWith(expect.any(String), SX_SPACE + '/12', {
+      signal: expect.any(AbortSignal)
+    })
     // The off-chain Hub must not be consulted for an SX space.
     expect(fetchProposal).not.toHaveBeenCalled()
   })
