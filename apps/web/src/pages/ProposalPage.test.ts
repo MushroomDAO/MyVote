@@ -90,7 +90,7 @@ function proposal() {
   return {
     id: '0xprop',
     title: 'Test',
-    state: 'open',
+    state: 'active',
     author: '0x1111111111111111111111111111111111111111',
     start: 1700000000,
     end: 1800000000,
@@ -174,6 +174,19 @@ describe('ProposalPage vote errors', () => {
 
     expect(wrapper.text()).toContain('HUB_REJECTED:400:no voting power')
     expect(wrapper.text()).not.toContain('中文兜底')
+  })
+
+  it('disables submit on a closed off-chain proposal', async () => {
+    authState.providerId = 'wallet'
+    authState.user = { address: '0x1111111111111111111111111111111111111111' }
+    fetchProposal.mockResolvedValue({ proposal: { ...proposal(), state: 'closed' } })
+
+    const wrapper = mount(ProposalPage, { global: { plugins: [i18n] } })
+    await flushPromises()
+    await wrapper.find('.choiceButton').trigger('click')
+
+    expect(wrapper.find('.submit').attributes('disabled')).toBeDefined()
+    expect(castVote).not.toHaveBeenCalled()
   })
 })
 

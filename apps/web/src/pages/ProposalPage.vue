@@ -44,6 +44,17 @@ const SX_BLOCK_CODES: Record<SxVoteBlock, ErrorCode> = {
   'not-started': 'sxVoteNotStarted',
   'no-authenticator': 'sxNoAuthenticator'
 }
+
+/**
+ * Off-chain Hub proposals are votable only while `active`. Kept conservative:
+ * only the known non-votable states disable the button, so an unexpected value
+ * never blocks a legitimate vote.
+ */
+const offchainClosed = computed(() =>
+  proposal.value ? ['closed', 'pending'].includes(proposal.value.state.toLowerCase()) : false
+)
+/** Whether the current proposal can be voted on right now. */
+const canVote = computed(() => (isSx.value ? !sxClosed.value : !offchainClosed.value))
 /** Raw indexed SX proposal — carries the authenticator/strategies a vote needs. */
 const sxProposal = ref<SxProposal | null>(null)
 
@@ -384,7 +395,7 @@ onMounted(() => {
         <button
           class="submit"
           type="button"
-          :disabled="submittingVote || (isSx && sxClosed)"
+          :disabled="submittingVote || !canVote"
           @click="submitVote"
         >
           {{ submittingVote ? t('loading') : t('submitVote') }}
