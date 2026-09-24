@@ -4,7 +4,8 @@ const LOCALE_STORAGE_KEY = 'locale'
 
 export type AppLocale = 'zh-CN' | 'en'
 
-const messages: Record<AppLocale, Record<string, string>> = {
+/** Exported so the i18n coverage test can assert both catalogs are complete. */
+export const messages: Record<AppLocale, Record<string, string>> = {
   'zh-CN': {
     appTitle: 'MyVote',
     explore: '探索',
