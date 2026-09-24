@@ -198,6 +198,56 @@ describe('SpacePage read cancellation', () => {
   })
 })
 
+describe('SpacePage pagination lookahead', () => {
+  function proposals(count: number) {
+    return Array.from({ length: count }, (_, i) => ({
+      id: 'p' + i,
+      title: 'P' + i,
+      created: 1700000000 + i,
+      state: 'active'
+    }))
+  }
+
+  it('asks for one extra row as the lookahead', async () => {
+    fetchSpaceWithProposals.mockResolvedValueOnce({
+      space: { id: 'space-a', name: 'A' },
+      proposals: proposals(5)
+    })
+    route.params.id = 'space-a'
+    mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    const params = fetchSpaceWithProposals.mock.calls[0]![1] as { first: number }
+    expect(params.first).toBe(21)
+  })
+
+  it('hides Load more on an exact multiple of the page size', async () => {
+    fetchSpaceWithProposals.mockResolvedValueOnce({
+      space: { id: 'space-a', name: 'A' },
+      proposals: proposals(20)
+    })
+    route.params.id = 'space-a'
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.findAll('.item')).toHaveLength(20)
+    expect(wrapper.find('.moreBtn').exists()).toBe(false)
+  })
+
+  it('shows Load more but renders only a page when the lookahead row arrives', async () => {
+    fetchSpaceWithProposals.mockResolvedValueOnce({
+      space: { id: 'space-a', name: 'A' },
+      proposals: proposals(21)
+    })
+    route.params.id = 'space-a'
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.findAll('.item')).toHaveLength(20)
+    expect(wrapper.find('.moreBtn').exists()).toBe(true)
+  })
+})
+
 describe('SpacePage error recovery', () => {
   it('offers a retry that refetches the space', async () => {
     fetchSpaceWithProposals

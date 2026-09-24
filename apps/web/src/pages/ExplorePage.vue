@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import { GRAPHQL_ENDPOINT, SX_API_ENDPOINT } from '../config'
 import { fetchSpaces, type Space } from '../lib/graphql'
 import { cacheGet, cacheSet, cacheDelete, scopedCacheKey } from '../lib/cache'
+import { takePage } from '../lib/pageCursor'
 import { createRequestGuard } from '../lib/requestGuard'
 import { fetchSxSpaces, type SxSpace } from '../lib/sx/api'
 import { sxNetworkLabel } from '../lib/sx/backend'
@@ -47,8 +48,10 @@ async function loadSpaces(skip: number, forceRefresh = false) {
     if (!forceRefresh) {
       const cached = cacheGet<Space[]>(CACHE_KEY)
       if (cached) {
-        spaces.value = cached
-        hasMore.value = cached.length === PAGE_SIZE
+        // The cache holds the raw lookahead page, so the flag stays exact.
+        const { page, hasMore: more } = takePage(cached, PAGE_SIZE)
+        spaces.value = page
+        hasMore.value = more
         fromCache.value = true
         return
       }
@@ -62,16 +65,17 @@ async function loadSpaces(skip: number, forceRefresh = false) {
   const token = guard.next()
   const signal = guard.signal
   try {
-    const data = await fetchSpaces(GRAPHQL_ENDPOINT, { first: PAGE_SIZE, skip, signal })
+    // One extra row is the lookahead that makes hasMore exact.
+    const data = await fetchSpaces(GRAPHQL_ENDPOINT, { first: PAGE_SIZE + 1, skip, signal })
     if (!guard.isCurrent(token)) return
-    const newItems = data.spaces
+    const { page, hasMore: more } = takePage(data.spaces, PAGE_SIZE)
     if (skip === 0) {
-      spaces.value = newItems
-      cacheSet(CACHE_KEY, newItems)
+      spaces.value = page
+      cacheSet(CACHE_KEY, data.spaces)
     } else {
-      spaces.value = [...spaces.value, ...newItems]
+      spaces.value = [...spaces.value, ...page]
     }
-    hasMore.value = newItems.length === PAGE_SIZE
+    hasMore.value = more
   } catch (e) {
     if (!guard.isCurrent(token)) return
     error.value = e instanceof Error ? e.message : String(e)

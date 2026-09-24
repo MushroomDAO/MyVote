@@ -67,6 +67,33 @@ afterEach(() => {
   vi.resetAllMocks()
 })
 
+describe('ExplorePage pagination lookahead', () => {
+  const spaces = (count: number) =>
+    Array.from({ length: count }, (_, i) => ({ id: 's' + i, name: 'S' + i }))
+
+  it('asks for one extra row and hides Load more on an exact multiple', async () => {
+    fetchSpaces.mockResolvedValueOnce({ spaces: spaces(30) })
+    fetchSxSpaces.mockResolvedValue([])
+    const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    const params = fetchSpaces.mock.calls[0]![1] as { first: number }
+    expect(params.first).toBe(31)
+    expect(wrapper.findAll('.item')).toHaveLength(30)
+    expect(wrapper.find('.moreBtn').exists()).toBe(false)
+  })
+
+  it('shows Load more when the lookahead row comes back', async () => {
+    fetchSpaces.mockResolvedValueOnce({ spaces: spaces(31) })
+    fetchSxSpaces.mockResolvedValue([])
+    const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.findAll('.item')).toHaveLength(30)
+    expect(wrapper.find('.moreBtn').exists()).toBe(true)
+  })
+})
+
 describe('ExplorePage on-chain failure', () => {
   it('shows a hint and retries when the on-chain list fails', async () => {
     fetchSpaces.mockResolvedValue({ spaces: [] })
