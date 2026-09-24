@@ -122,9 +122,12 @@ Handy entry points:
 - [`docs/snapshot-version-decision.md`](./docs/snapshot-version-decision.md) — classic vs new stack
 - [`docs/snapshot-x-integration.md`](./docs/snapshot-x-integration.md) — Snapshot X (on-chain) integration guide
 - [`docs/deployment.md`](./docs/deployment.md) — environments, KV namespaces, secrets, runbook
+- [`docs/M1-clone-deploy.md`](./docs/M1-clone-deploy.md) — clone & deploy for a new community
 - [`docs/M2-multi-tenant.md`](./docs/M2-multi-tenant.md) — multi-tenancy
 - [`docs/architecture-review.md`](./docs/architecture-review.md) — tech-debt review
 - [`docs/development-loop.md`](./docs/development-loop.md) — dev loop & pre-PR check
+- [`docs/check-list.md`](./docs/check-list.md) — step-by-step feature checklist for new staff
+- [`docs/SnapshotX.md`](./docs/SnapshotX.md) — historical Snapshot X research (partly outdated)
 
 ---
 
