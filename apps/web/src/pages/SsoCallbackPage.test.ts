@@ -79,13 +79,26 @@ describe('SsoCallbackPage', () => {
 
     expect(replace).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Sign-in failed')
-    expect(wrapper.text()).toContain('invalid_grant')
+    // Exact text: rendering the raw Ref would JSON-quote the message.
+    expect(wrapper.get('.error').text()).toBe('SSO 交换失败 (401): invalid_grant')
 
     const retry = wrapper.find('button')
     expect(retry.text()).toBe('Log in again')
 
     await retry.trigger('click')
     expect(startLogin).toHaveBeenCalledTimes(1)
+  })
+
+  it('omits the error block when the failure carried no message', async () => {
+    // A non-auth failure (e.g. the post-login redirect) leaves auth.error empty.
+    completeSsoLogin.mockResolvedValueOnce('/explore')
+    replace.mockRejectedValueOnce(new Error('bad route'))
+
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Sign-in failed')
+    expect(wrapper.find('.error').exists()).toBe(false)
   })
 
   it('shows the loading state while the exchange is in flight', async () => {
