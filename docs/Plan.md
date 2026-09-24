@@ -35,6 +35,7 @@
 | **M1** Clone & Deploy | 品牌单文件定制、CSS 变量主题、Explore/Space/Proposal 三页、EIP-712 投票、Markdown 正文、zh-CN/en、分页 | ✅ 完成 |
 | **M2** Multi-Tenant | 边缘 `_middleware.ts` 从 **KV** 解析 hostname → 注入 `window.__TENANT__`；`/api/graphql` 代理（国内连通） | ✅ 完成 |
 | **M2.5** 自助注册 | `api/register.ts` 自助子域名注册 + 名称可用性检查；CF 代理 + 内存缓存 + 刷新 | ✅ 完成（**待安全加固**，见 M6） |
+| **Testnet 社区 E2E** | Sepolia 链下全流程：ENSv2 注册 → 建 space → 建提案 → Jason/Anni 真实投票 | ✅ 完成（[`docs/testnet-space-e2e.md`](./testnet-space-e2e.md)） |
 | **AirAccount** | cos72 SSO 会话 + 远程 KMS 签名适配层 | 🟡 管道已通，**KMS 后端（E-5）未交付** |
 
 当前数据层默认指向 **testnet hub**（`https://testnet.hub.snapshot.org`），因为目标是 Sepolia 空间。
@@ -111,6 +112,22 @@
       _另：SX 提案页会按索引器识别当前账户是否已投票——命中则禁用提交并给出
       交易链接（#57）；该查询格式（`proposal` 用数字 id、`voter` 用校验和地址）
       由 opt-in live 用例固定（`SX_LIVE=1 vitest run src/lib/sx/api.test.ts`）。_
+
+### M5.5 — 测试网链下 Space 全流程 live 验证（本轮完成）
+
+**目标**：在真实 Snapshot testnet hub 上验证「建社区 → 建提案 → 真实投票」全链路，而不是只靠单测。
+
+- [x] 在 Sepolia 注册 ENSv2 名 `myvote-demo.eth`。Sepolia 的 **ENSv1 registrar 已停用**
+      （`BaseRegistrar.controllers` 对已知 controller 全为 `false`），新注册只能走 ENSv2，
+      费用用 **USDC** 计价，仍是 commit–reveal（`MIN_COMMITMENT_AGE = 60s`）。
+      _关键坑：Sepolia 上有两套 ENSv2 部署，必须用 Universal Resolver 看到的那套
+      （registrar `0xabe76f6c…94ca` → `eth` registry `0x657eA849…E09E`）；
+      另一套（`0x8c2e866b…ffca`）链上注册成功但 Snapshot 解析不到，建 space 报 `not allowed`。_
+- [x] 建 space `myvote-demo.eth`（`network = "11155111"`，`whitelist` 策略），
+      sequencer 回执 `0x74754aef…8017`。
+- [x] 建提案 `0xda42312a…b6b3`，并用 Jason / Anni 两个账户**经 MyVote 自己的
+      `castVote()`** 真实投票；计票 `scores [1,1,0]` / `scores_total 2` / `votes 2`。
+- 可复现步骤、自检方法与踩坑清单：[`docs/testnet-space-e2e.md`](./testnet-space-e2e.md)。
 
 ### M6 — 自助注册安全加固与多租户运维
 
@@ -189,6 +206,7 @@
 
 - 选型决策：[`docs/snapshot-version-decision.md`](./snapshot-version-decision.md)
 - 历史调研（含过时结论）：[`docs/SnapshotX.md`](./SnapshotX.md)
+- 测试网 Space 全流程：[`docs/testnet-space-e2e.md`](./testnet-space-e2e.md)
 - 多租户实现：[`docs/M2-multi-tenant.md`](./M2-multi-tenant.md)
 - 仓库架构评审：[`docs/architecture-review.md`](./architecture-review.md)
 - 开发循环与 pre-PR：[`docs/development-loop.md`](./development-loop.md)
