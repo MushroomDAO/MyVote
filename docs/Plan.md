@@ -90,6 +90,10 @@
 - [x] **代码分割验证**：`@snapshot-labs/sx` 现在是独立 lazy chunk（~851 KB + shutter wasm），
       仅在实际投 SX 票时加载；主 chunk 仅 +~9 KB
 - [ ] 在真实 SX space 上完成一次真实投票（需要该 space 的投票权 + 钱包；Ryu0x167 可作为目标）
+      _2026-09 复核：修复了 `castVote` **只签名不提交**的缺陷（#52）——sx.js `vote()`
+      只产出签名信封，需再调 `send()` 才发给 Mana；中继无结果时报错。并加 opt-in 的
+      中继连通性检查（`SX_LIVE=1 vitest run src/lib/sx/backend.test.ts`，验 `eth_rpc/10`
+      的 JSON-RPC 端点契约，不需要投票权）。真实投票本身仍待有投票权的钱包。_
 
 ### M6 — 自助注册安全加固与多租户运维
 
@@ -135,6 +139,8 @@
       typecheck + test + build（只校验不部署，见 `docs/development-loop.md`）。
 - [x] 预览部署自检：`scripts/deploy-preview.sh` 部署后对分支别名做冒烟检查
       （HTTP 200 + `id="app"`），见 `docs/deployment.md` §2。
+- [x] 修复 SX 链上投票只签名不提交（#52）：`castVote` 走 `vote()` → `send()` 两步，
+      中继无结果时报错；并补 opt-in 的 `SX_LIVE=1` 中继连通性检查。
 - [ ] 真实 SX 投票 E2E 与注册鉴权仍按 M5 / M6 的阻塞项处理。
 
 ---
