@@ -4,13 +4,14 @@ import { useI18n } from 'vue-i18n'
 
 import { GRAPHQL_ENDPOINT } from '../config'
 import { fetchSpaces, type Space } from '../lib/graphql'
-import { cacheGet, cacheSet, cacheDelete } from '../lib/cache'
+import { cacheGet, cacheSet, cacheDelete, scopedCacheKey } from '../lib/cache'
 import { createRequestGuard } from '../lib/requestGuard'
 
 const { t } = useI18n()
 
 const PAGE_SIZE = 30
-const CACHE_KEY = 'explore:spaces'
+// Namespaced by host so one tenant's spaces never serve another's cache.
+const CACHE_KEY = scopedCacheKey('explore:spaces')
 
 const guard = createRequestGuard()
 

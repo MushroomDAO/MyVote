@@ -26,3 +26,15 @@ export function cacheSet<T>(key: string, data: T): void {
 export function cacheDelete(key: string): void {
   store.delete(key)
 }
+
+/**
+ * Builds a cache key namespaced by scope (defaults to the current host).
+ *
+ * The store is per document, but one deployment serves many tenants from the
+ * same bundle. A bare key would let one tenant's data be read back under another
+ * if a client ever changes tenant without a full reload — namespace it.
+ */
+export function scopedCacheKey(namespace: string, scope?: string): string {
+  const value = scope ?? (typeof window !== 'undefined' ? window.location.host : '')
+  return `${namespace}:${value || 'default'}`
+}
