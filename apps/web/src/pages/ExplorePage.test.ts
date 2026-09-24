@@ -47,7 +47,8 @@ const i18n = createI18n({
       openSxPlaceholder: 'SX address',
       openSxButton: 'Open',
       openSxInvalid: 'INVALID_SX',
-      onchainSpaces: 'On-chain spaces'
+      onchainSpaces: 'On-chain spaces',
+      error: 'SX_ERROR'
     }
   }
 })
@@ -64,6 +65,24 @@ async function mountExplore() {
 
 afterEach(() => {
   vi.resetAllMocks()
+})
+
+describe('ExplorePage on-chain failure', () => {
+  it('shows a hint and retries when the on-chain list fails', async () => {
+    fetchSpaces.mockResolvedValue({ spaces: [] })
+    fetchSxSpaces
+      .mockRejectedValueOnce(new Error('SX_DOWN'))
+      .mockResolvedValueOnce([{ id: SX, name: 'Ryu0x167', network: 'optimism' }])
+
+    const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.get('.onchainCard').text()).toContain('SX_ERROR')
+    await wrapper.get('.onchainCard .retryBtn').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('.onchainCard').text()).toContain('Ryu0x167')
+  })
 })
 
 describe('ExplorePage read cancellation', () => {

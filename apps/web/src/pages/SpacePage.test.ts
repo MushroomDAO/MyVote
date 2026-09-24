@@ -45,7 +45,8 @@ const i18n = createI18n({
       proposals: 'Proposals',
       loadMore: 'Load more',
       sxOnchain: 'ONCHAIN',
-      network: 'Network'
+      network: 'Network',
+      retry: 'Retry'
     }
   }
 })
@@ -194,5 +195,24 @@ describe('SpacePage read cancellation', () => {
     expect(signal.aborted).toBe(true)
     pending.resolve(spaceResult('space-a', 'Space A'))
     await flushPromises()
+  })
+})
+
+describe('SpacePage error recovery', () => {
+  it('offers a retry that refetches the space', async () => {
+    fetchSpaceWithProposals
+      .mockRejectedValueOnce(new Error('HUB_DOWN'))
+      .mockResolvedValueOnce(spaceResult('space-a', 'Space A'))
+
+    route.params.id = 'space-a'
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('HUB_DOWN')
+    await wrapper.get('.retryBtn').trigger('click')
+    await flushPromises()
+
+    expect(fetchSpaceWithProposals).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('Space A')
   })
 })

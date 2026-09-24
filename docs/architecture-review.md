@@ -16,7 +16,7 @@
 | 注册 TOCTOU 竞态 | 🟡 写入 reservation 后读回确认（#11）；彻底修复需 Durable Objects（KV 无 CAS） |
 | `_middleware` 注入 `__TENANT__` 未转义 `<` | ✅ `escapeForScript`（#11） |
 | `register.ts` 吞掉 CF 域名注册失败 | ✅ 失败**回滚 KV 并返回 502**（#14），成功/未托管写入 `domainStatus` |
-| 读取路径无取消 / 去重 | ✅ 过期响应令牌守卫（#6）；`AbortController` 仍为可选未做 |
+| 读取路径无取消 / 去重 | ✅ 过期响应令牌守卫（#6）；`AbortController` 取消已接入读取层与三个页面（#41/#42），读取失败可重试 |
 | 投票后不失效缓存 | ✅ Explore 缓存按 host 隔离（#7）；投票数据不在该缓存中，暂无需失效 |
 | 读取路径零测试 | ✅ `lib/graphql.ts`、`lib/sx/*`、页面竞态与协议分流均有测试；Functions 三路由均有端点测试（#14/#29/#30） |
 | 错误信息硬编码中文 | ✅ 投票路径与 auth/SSO 路径均改为**稳定错误码 + i18n**（#10/#19） |
