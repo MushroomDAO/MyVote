@@ -129,6 +129,12 @@
       登录态误判、`SsoCallbackPage` 的空错误块。根因相同——`<script setup>` 只
       自动解包**顶层**绑定，而模板里访问了 `useAuth()` 返回对象上的 ref；
       现统一解构为顶层 ref。
+- [x] 补上分页 lookahead：`lib/pageCursor.ts` 每页多取一条，`hasMore` 不再在
+      页大小整数倍时给出空翻页（#48）。
+- [x] 补上 CI：`.github/workflows/ci.yml` 在 PR / push 到 main、dev 时跑
+      typecheck + test + build（只校验不部署，见 `docs/development-loop.md`）。
+- [x] 预览部署自检：`scripts/deploy-preview.sh` 部署后对分支别名做冒烟检查
+      （HTTP 200 + `id="app"`），见 `docs/deployment.md` §2。
 - [ ] 真实 SX 投票 E2E 与注册鉴权仍按 M5 / M6 的阻塞项处理。
 
 ---

@@ -35,6 +35,8 @@ apps/web/scripts/deploy-preview.sh [branch]   # 默认 dev
 
 脚本会：构建 → 把 `wrangler.preview.toml`（预览命名空间）复制到临时目录 → 软链 `functions` → 用 `--cwd <temp>` 部署 → 清理临时目录。
 
+部署后还会做一次**冒烟检查**：从 wrangler 输出里取出分支别名 URL（可用 `CF_PREVIEW_URL` 覆盖），`curl` 首页并要求 HTTP 200 且包含 `id="app"`；任一不满足则脚本非零退出，避免"部署成功但别名指向空/过期项目"。
+
 **验证隔离**：部署后调用一次 `GET /api/check?name=probe`，然后确认 `rl:check:*` 键出现在**预览**命名空间、生产命名空间为空。
 
 ---
