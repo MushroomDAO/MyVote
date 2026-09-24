@@ -1,19 +1,27 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 
 import { GRAPHQL_ENDPOINT } from '../config'
 import { fetchSpaces, type Space } from '../lib/graphql'
 import { cacheGet, cacheSet, cacheDelete, scopedCacheKey } from '../lib/cache'
 import { createRequestGuard } from '../lib/requestGuard'
+import { protocolForSpaceId } from '../lib/voteRouting'
 
 const { t } = useI18n()
+const router = useRouter()
 
 const PAGE_SIZE = 30
 // Namespaced by host so one tenant's spaces never serve another's cache.
 const CACHE_KEY = scopedCacheKey('explore:spaces')
 
 const guard = createRequestGuard()
+
+// Snapshot X spaces are contracts, not ENS names, so they are not in the Hub
+// listing above. Let users open one directly by address.
+const sxAddress = ref('')
+const sxError = ref<string | null>(null)
 
 const spaces = ref<Space[]>([])
 const loading = ref(false)
@@ -72,6 +80,16 @@ function refresh() {
   void loadSpaces(0, true)
 }
 
+function openSxSpace() {
+  const address = sxAddress.value.trim()
+  if (protocolForSpaceId(address) !== 'snapshot-x') {
+    sxError.value = t('openSxInvalid')
+    return
+  }
+  sxError.value = null
+  void router.push(`/space/${address}`)
+}
+
 onMounted(() => {
   void loadSpaces(0)
 })
@@ -85,6 +103,21 @@ onMounted(() => {
         ↻
       </button>
     </div>
+
+    <div class="sxRow">
+      <input
+        v-model="sxAddress"
+        class="sxInput"
+        type="text"
+        spellcheck="false"
+        autocomplete="off"
+        :placeholder="t('openSxPlaceholder')"
+        @keyup.enter="openSxSpace"
+      />
+      <button class="sxBtn" type="button" @click="openSxSpace">{{ t('openSxButton') }}</button>
+    </div>
+    <div v-if="sxError" class="sxError">{{ sxError }}</div>
+
     <section class="card">
       <div class="cardHeader">
         <span class="muted">{{ t('spaces') }}</span>
@@ -121,6 +154,38 @@ onMounted(() => {
   max-width: 960px;
   margin: 0 auto;
   padding: 24px;
+}
+
+.sxRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sxInput {
+  flex: 1;
+  border: 1px solid var(--mv-border-md);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.sxBtn {
+  border: 1px solid var(--mv-border-md);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--mv-surface);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.sxError {
+  margin: -4px 0 12px;
+  color: var(--mv-error);
+  font-size: 13px;
 }
 
 .titleRow {

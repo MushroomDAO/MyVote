@@ -80,7 +80,10 @@ const messages: Record<AppLocale, Record<string, string>> = {
     registerError: '注册失败',
     refresh: '刷新',
     retry: '重试',
-    cached: '缓存'
+    cached: '缓存',
+    openSxPlaceholder: '打开链上空间：粘贴 Snapshot X 空间地址 (0x…)',
+    openSxButton: '打开',
+    openSxInvalid: '请输入有效的 Snapshot X 空间地址（0x 开头的 40 位十六进制）'
   },
   en: {
     appTitle: 'MyVote',
@@ -160,7 +163,10 @@ const messages: Record<AppLocale, Record<string, string>> = {
     registerError: 'Registration failed',
     refresh: 'Refresh',
     retry: 'Retry',
-    cached: 'cached'
+    cached: 'cached',
+    openSxPlaceholder: 'Open an on-chain space: paste a Snapshot X address (0x…)',
+    openSxButton: 'Open',
+    openSxInvalid: 'Enter a valid Snapshot X space address (0x + 40 hex characters)'
   }
 }
 
