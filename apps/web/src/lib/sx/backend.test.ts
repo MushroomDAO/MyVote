@@ -178,3 +178,28 @@ describe('createSnapshotXEvmBackend', () => {
     })
   })
 })
+
+// Opt-in live check against the real relayer:
+//   SX_LIVE=1 vitest run src/lib/sx/backend.test.ts
+// No voting power is needed — this pins the endpoint contract castVote now
+// depends on (path incl. chainId, JSON-RPC framing), not the outcome of a vote.
+describe.skipIf(!process.env.SX_LIVE)('Mana relayer (SX_LIVE=1)', () => {
+  it('answers JSON-RPC at the optimistic chain endpoint', async () => {
+    const response = await fetch(`${SX_MANA_URL}/eth_rpc/10`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'send', params: { envelope: {} }, id: null })
+    })
+
+    const body = (await response.json()) as {
+      jsonrpc?: string
+      result?: unknown
+      error?: unknown
+    }
+
+    expect(body.jsonrpc).toBe('2.0')
+    // An empty envelope is rejected by the relayer, and the rejection carries no
+    // `result` — which is why castVote treats a missing result as a failure.
+    expect(body.error ?? body.result).toBeDefined()
+  })
+})
