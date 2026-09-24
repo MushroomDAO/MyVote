@@ -5,11 +5,14 @@ import { useRoute } from 'vue-router'
 
 import { GRAPHQL_ENDPOINT } from '../config'
 import { fetchSpaceWithProposals, type ProposalListItem, type Space } from '../lib/graphql'
+import { createRequestGuard } from '../lib/requestGuard'
 
 const { t, locale } = useI18n()
 const route = useRoute()
 
 const PAGE_SIZE = 20
+
+const guard = createRequestGuard()
 
 const spaceId = computed(() => String(route.params.id ?? ''))
 
@@ -45,12 +48,14 @@ async function loadSpace(skip: number) {
     loadingMore.value = true
   }
   error.value = null
+  const token = guard.next()
   try {
     const data = await fetchSpaceWithProposals(GRAPHQL_ENDPOINT, {
       spaceId: spaceId.value,
       first: PAGE_SIZE,
       skip
     })
+    if (!guard.isCurrent(token)) return
 
     if (skip === 0) {
       space.value = data.space
@@ -60,14 +65,17 @@ async function loadSpace(skip: number) {
     }
     hasMore.value = data.proposals.length === PAGE_SIZE
   } catch (e) {
+    if (!guard.isCurrent(token)) return
     error.value = e instanceof Error ? e.message : String(e)
     if (skip === 0) {
       space.value = null
       proposals.value = []
     }
   } finally {
-    loading.value = false
-    loadingMore.value = false
+    if (guard.isCurrent(token)) {
+      loading.value = false
+      loadingMore.value = false
+    }
   }
 }
 

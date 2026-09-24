@@ -9,6 +9,7 @@ import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME } from '../config'
 import { useAuth } from '../auth/useAuth'
 import { KmsNotConfiguredError } from '../auth/kms'
 import { fetchProposal, type Proposal, type ProposalType } from '../lib/graphql'
+import { createRequestGuard } from '../lib/requestGuard'
 import { type VoteChoice } from '../lib/snapshotVote'
 import { activeVoteBackend } from '../lib/voteBackend'
 
@@ -17,6 +18,7 @@ const route = useRoute()
 const auth = useAuth()
 
 const proposalId = computed(() => String(route.params.id ?? ''))
+const guard = createRequestGuard()
 
 const proposal = ref<Proposal | null>(null)
 const loading = ref(false)
@@ -71,14 +73,19 @@ async function loadProposal() {
   voteReceipt.value = null
   selectedChoice.value = null
   reason.value = ''
+  const token = guard.next()
   try {
     const data = await fetchProposal(GRAPHQL_ENDPOINT, { proposalId: proposalId.value })
+    if (!guard.isCurrent(token)) return
     proposal.value = data.proposal
   } catch (e) {
+    if (!guard.isCurrent(token)) return
     error.value = e instanceof Error ? e.message : String(e)
     proposal.value = null
   } finally {
-    loading.value = false
+    if (guard.isCurrent(token)) {
+      loading.value = false
+    }
   }
 }
 
