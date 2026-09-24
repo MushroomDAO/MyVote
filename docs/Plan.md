@@ -93,7 +93,10 @@
       _2026-09 复核：修复了 `castVote` **只签名不提交**的缺陷（#52）——sx.js `vote()`
       只产出签名信封，需再调 `send()` 才发给 Mana；中继无结果时报错。并加 opt-in 的
       中继连通性检查（`SX_LIVE=1 vitest run src/lib/sx/backend.test.ts`，验 `eth_rpc/10`
-      的 JSON-RPC 端点契约，不需要投票权）。真实投票本身仍待有投票权的钱包。_
+      的 JSON-RPC 端点契约，不需要投票权）。真实投票本身仍待有投票权的钱包。
+      _另：SX 提案页会按索引器识别当前账户是否已投票——命中则禁用提交并给出
+      交易链接（#57）；该查询格式（`proposal` 用数字 id、`voter` 用校验和地址）
+      由 opt-in live 用例固定（`SX_LIVE=1 vitest run src/lib/sx/api.test.ts`）。_
 
 ### M6 — 自助注册安全加固与多租户运维
 
@@ -141,6 +144,12 @@
       （HTTP 200 + `id="app"`），见 `docs/deployment.md` §2。
 - [x] 修复 SX 链上投票只签名不提交（#52）：`castVote` 走 `vote()` → `send()` 两步，
       中继无结果时报错；并补 opt-in 的 `SX_LIVE=1` 中继连通性检查。
+- [x] 提案列表状态筛选（全部 / 进行中 / 已结束）：链下 `$state: String`、链上
+      `$state: ProposalState` 枚举，变量省略即不加谓词（#55）。
+- [x] 链下投票成功后重读提案，新票数在回执下方显示（#56）。
+- [x] 两端「已投票」识别：链上禁用重复投票 + 交易链接 + 权重（#57、#58），
+      链下提示 + 预选可改（#59）。
+- [x] Explore 链上空间列表分页（`SX_PAGE_SIZE=6` + lookahead）（#54）。
 - [ ] 真实 SX 投票 E2E 与注册鉴权仍按 M5 / M6 的阻塞项处理。
 
 ---
