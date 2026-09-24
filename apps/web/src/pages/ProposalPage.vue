@@ -9,6 +9,7 @@ import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME } from '../config'
 import { useAuth } from '../auth/useAuth'
 import { EmailSigningUnsupportedError } from '../auth/emailProvider'
 import { KmsNotConfiguredError } from '../auth/kms'
+import { resolveErrorMessage } from '../lib/errors'
 import { fetchProposal, type Proposal, type ProposalType } from '../lib/graphql'
 import { createRequestGuard } from '../lib/requestGuard'
 import { type VoteChoice } from '../lib/snapshotVote'
@@ -149,7 +150,9 @@ async function submitVote() {
       // Expected for the interim email identity: it holds no key.
       voteError.value = t('emailSigningUnsupported')
     } else {
-      voteError.value = e instanceof Error ? e.message : String(e)
+      // Coded errors (e.g. hub rejection) are translated; others fall back to
+      // their own message.
+      voteError.value = resolveErrorMessage(e, t)
     }
   } finally {
     submittingVote.value = false

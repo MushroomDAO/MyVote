@@ -1,6 +1,7 @@
 import { getAddress } from 'viem'
 
 import type { TypedDataField, TypedDataPayload } from '../auth/kms'
+import { AppError } from './errors'
 
 /**
  * Snapshot vote signing + submission, without snapshot.js.
@@ -195,13 +196,17 @@ export async function submitVoteEnvelope(
     // clock. That reads as an opaque "invalid timestamp" — name the real cause,
     // because the fix is on the user's machine, not in the app.
     if (/timestamp/i.test(message)) {
-      throw new Error(
+      throw new AppError(
+        'voteClockSkew',
         `Snapshot hub 拒绝了投票:签名时间戳超出允许范围 (${message})。` +
           `通常是本机系统时间不准,请校准后重试。`
       )
     }
 
-    throw new Error(`Snapshot hub 拒绝了投票 (${response.status}): ${message}`)
+    throw new AppError('voteRejected', `Snapshot hub 拒绝了投票 (${response.status}): ${message}`, {
+      status: response.status,
+      detail: message
+    })
   }
 
   return payload
