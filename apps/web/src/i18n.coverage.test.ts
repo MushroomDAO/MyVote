@@ -8,8 +8,9 @@ import { messages } from './i18n'
  * Every static `t('key')` / `$t('key')` must exist in both catalogs.
  *
  * A missing key silently renders as the key itself, which is easy to ship and
- * hard to notice. Dynamic keys (error codes resolved through `errorKey`) are
- * not literals here, so they are intentionally out of scope.
+ * hard to notice. Dynamic keys (error codes resolved through `errorKey`, filter
+ * labels passed as variables) are not literals here, so the catalog-parity test
+ * below is what covers them.
  */
 // Vitest may run from the package dir or the repo root; accept both.
 const SRC =
@@ -60,8 +61,10 @@ describe('i18n coverage', () => {
     })
   }
 
-  it('keeps both catalogs the same size', () => {
-    const [a, b] = locales.map((l) => Object.keys(messages[l]).length)
-    expect(a).toBe(b)
+  it('defines exactly the same keys in every catalog', () => {
+    // Count-equality would miss a key that exists in one locale but not the
+    // other; dynamic lookups need the sets to match, not just their sizes.
+    const [first, ...rest] = locales.map((l) => Object.keys(messages[l]).sort())
+    for (const keys of rest) expect(keys).toEqual(first)
   })
 })
