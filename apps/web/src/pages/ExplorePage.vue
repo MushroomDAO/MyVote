@@ -16,6 +16,8 @@ const { t } = useI18n()
 const router = useRouter()
 
 const PAGE_SIZE = 30
+/** The on-chain preview list is shorter, so it pages in smaller steps. */
+const SX_PAGE_SIZE = 6
 // Namespaced by host so one tenant's spaces never serve another's cache.
 const CACHE_KEY = scopedCacheKey('explore:spaces')
 
@@ -32,6 +34,8 @@ const sxError = ref<string | null>(null)
 // Recently created on-chain spaces — the Hub listing only has ENS spaces.
 const sxSpaces = ref<SxSpace[]>([])
 const sxLoading = ref(false)
+const sxLoadingMore = ref(false)
+const sxHasMore = ref(false)
 /** True when the last on-chain list read failed (it is best-effort). */
 const sxFailed = ref(false)
 
@@ -97,20 +101,38 @@ function refresh() {
 }
 
 /** Best-effort: a failure here must not take down the off-chain Explore list. */
-async function loadSxSpaces() {
-  sxLoading.value = true
+async function loadSxSpaces(skip = 0) {
+  if (skip === 0) sxLoading.value = true
+  else sxLoadingMore.value = true
   sxFailed.value = false
   const token = sxGuard.next()
   try {
-    sxSpaces.value = await fetchSxSpaces(SX_API_ENDPOINT, { first: 6, signal: sxGuard.signal })
+    // The lookahead row makes hasMore exact (see lib/pageCursor.ts).
+    const raw = await fetchSxSpaces(SX_API_ENDPOINT, {
+      first: SX_PAGE_SIZE + 1,
+      skip,
+      signal: sxGuard.signal
+    })
+    if (!sxGuard.isCurrent(token)) return
+    const { page, hasMore: more } = takePage(raw, SX_PAGE_SIZE)
+    sxSpaces.value = skip === 0 ? page : [...sxSpaces.value, ...page]
+    sxHasMore.value = more
   } catch {
     if (sxGuard.isCurrent(token)) {
-      sxSpaces.value = []
+      if (skip === 0) sxSpaces.value = []
       sxFailed.value = true
+      sxHasMore.value = false
     }
   } finally {
-    if (sxGuard.isCurrent(token)) sxLoading.value = false
+    if (sxGuard.isCurrent(token)) {
+      sxLoading.value = false
+      sxLoadingMore.value = false
+    }
   }
+}
+
+function loadMoreSxSpaces() {
+  void loadSxSpaces(sxSpaces.value.length)
 }
 
 function openSxSpace() {
@@ -195,7 +217,7 @@ onUnmounted(() => {
       <div v-if="sxLoading" class="placeholder">{{ t('loading') }}</div>
       <div v-else-if="sxFailed" class="error">
         {{ t('error') }}
-        <button class="retryBtn" type="button" @click="loadSxSpaces">{{ t('retry') }}</button>
+        <button class="retryBtn" type="button" @click="loadSxSpaces(0)">{{ t('retry') }}</button>
       </div>
       <div v-else-if="sxSpaces.length === 0" class="placeholder">{{ t('empty') }}</div>
       <ul v-else class="list">
@@ -206,6 +228,12 @@ onUnmounted(() => {
           </div>
         </li>
       </ul>
+
+      <div v-if="sxSpaces.length > 0 && sxHasMore" class="more">
+        <button class="moreBtn" type="button" :disabled="sxLoadingMore" @click="loadMoreSxSpaces">
+          {{ sxLoadingMore ? t('loading') : t('loadMore') }}
+        </button>
+      </div>
     </section>
   </main>
 </template>

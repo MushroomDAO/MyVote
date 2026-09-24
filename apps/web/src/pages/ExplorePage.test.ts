@@ -94,6 +94,55 @@ describe('ExplorePage pagination lookahead', () => {
   })
 })
 
+describe('ExplorePage on-chain pagination', () => {
+  const sxSpaces = (count: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      id: '0x' + i,
+      name: 'S' + i,
+      network: 'optimism'
+    }))
+
+  it('asks for one extra row and hides Load more on an exact multiple', async () => {
+    fetchSpaces.mockResolvedValue({ spaces: [] })
+    fetchSxSpaces.mockResolvedValueOnce(sxSpaces(6))
+    const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    const options = fetchSxSpaces.mock.calls[0]![1] as { first: number; skip: number }
+    expect(options.first).toBe(7)
+    expect(options.skip).toBe(0)
+    expect(wrapper.findAll('.onchainCard .item')).toHaveLength(6)
+    expect(wrapper.find('.onchainCard .moreBtn').exists()).toBe(false)
+  })
+
+  it('shows Load more and renders only a page when the lookahead arrives', async () => {
+    fetchSpaces.mockResolvedValue({ spaces: [] })
+    fetchSxSpaces.mockResolvedValueOnce(sxSpaces(7))
+    const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.findAll('.onchainCard .item')).toHaveLength(6)
+    expect(wrapper.find('.onchainCard .moreBtn').exists()).toBe(true)
+  })
+
+  it('appends the next page on Load more', async () => {
+    fetchSpaces.mockResolvedValue({ spaces: [] })
+    fetchSxSpaces
+      .mockResolvedValueOnce(sxSpaces(7))
+      .mockResolvedValueOnce([{ id: '0xextra', name: 'Extra', network: 'optimism' }])
+    const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    await wrapper.get('.onchainCard .moreBtn').trigger('click')
+    await flushPromises()
+
+    const second = fetchSxSpaces.mock.calls[1]![1] as { skip: number }
+    expect(second.skip).toBe(6)
+    expect(wrapper.findAll('.onchainCard .item')).toHaveLength(7)
+    expect(wrapper.get('.onchainCard').text()).toContain('Extra')
+  })
+})
+
 describe('ExplorePage on-chain failure', () => {
   it('shows a hint and retries when the on-chain list fails', async () => {
     fetchSpaces.mockResolvedValue({ spaces: [] })
