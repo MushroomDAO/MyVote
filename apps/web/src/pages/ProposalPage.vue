@@ -114,7 +114,10 @@ function sxToProposal(sx: SxProposal): Proposal {
     votes: sx.voteCount,
     scores: sx.scores,
     scores_total: sx.scoresTotal,
-    space: { id: sx.space?.id ?? sxSpaceId.value ?? '', name: sx.space?.id ?? '' }
+    space: {
+      id: sx.space?.id ?? sxSpaceId.value ?? '',
+      name: sx.space?.name ?? sx.space?.id ?? ''
+    }
   }
 }
 

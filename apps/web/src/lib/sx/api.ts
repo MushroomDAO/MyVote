@@ -39,7 +39,7 @@ export const SX_PROPOSAL_QUERY =
   'id proposal_id type metadata { title body choices } state snapshot start min_end max_end ' +
   'scores_1_parsed scores_2_parsed scores_3_parsed scores_total_parsed vote_count _indexer ' +
   STRATEGY_FIELDS +
-  ' space { id authenticators ' + STRATEGY_FIELDS + ' } ' +
+  ' space { id metadata { name } authenticators ' + STRATEGY_FIELDS + ' } ' +
   ' } }'
 
 /** Raw wire shapes (strings for big numbers, as the indexer returns them). */
@@ -76,10 +76,11 @@ export type SxProposalWire = {
   strategies_indices: number[]
   strategies: string[]
   strategies_params: string[]
-  space?: { id: string; authenticators: string[] } & Pick<
-    SxSpaceWire,
-    'strategies_indices' | 'strategies' | 'strategies_params'
-  >
+  space?: {
+    id: string
+    metadata?: { name: string | null } | null
+    authenticators: string[]
+  } & Pick<SxSpaceWire, 'strategies_indices' | 'strategies' | 'strategies_params'>
 }
 
 /** Indexer chain code → sx.js network id. */
@@ -128,7 +129,12 @@ export type SxProposal = {
   voteCount: number
   strategies: SxStrategyConfig[]
   /** Present when the proposal was fetched with its space (single-proposal query). */
-  space: { id: string; authenticators: string[]; strategies: SxStrategyConfig[] } | null
+  space: {
+    id: string
+    name: string | null
+    authenticators: string[]
+    strategies: SxStrategyConfig[]
+  } | null
 }
 
 /**
@@ -185,6 +191,7 @@ export function toSxProposal(wire: SxProposalWire): SxProposal {
     space: wire.space
       ? {
           id: wire.space.id,
+          name: wire.space.metadata?.name ?? null,
           authenticators: wire.space.authenticators ?? [],
           strategies: zipStrategies(
             wire.space.strategies_indices,
