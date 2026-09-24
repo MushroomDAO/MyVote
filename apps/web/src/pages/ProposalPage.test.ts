@@ -100,6 +100,7 @@ const i18n = createI18n({
       sxAlreadyVoted: 'SX_ALREADY_VOTED',
       sxViewTx: 'VIEW_TX',
       sxVotePower: 'VP',
+      sxYourChoice: 'YOUR_CHOICE',
       offchainAlreadyVoted: 'OFFCHAIN_VOTED'
     }
   }
@@ -336,8 +337,23 @@ describe('ProposalPage existing on-chain vote', () => {
     expect(wrapper.get('.sxVoteLink').attributes('href')).toBe(
       'https://optimistic.etherscan.io/tx/0xdeadbeef'
     )
-    // The indexed voting power is surfaced with the note.
+    // The indexed voting power and the chosen option are surfaced with the note.
     expect(wrapper.get('.sxVotePower').text()).toContain('2.5')
+    expect(wrapper.get('.sxVoteChoice').text()).toContain('For')
+  })
+
+  it('omits the choice label when the indexed index does not map', async () => {
+    routeState.params = { id: '12' }
+    routeState.query = { space: SX_SPACE }
+    authState.providerId = 'wallet'
+    authState.user = { address: '0x1111111111111111111111111111111111111111' }
+    fetchSxProposal.mockResolvedValue(sxProposal())
+    fetchSxVoterVote.mockResolvedValue({ id: 'x', choice: 99, vp: null, tx: '0xdeadbeef' })
+
+    const wrapper = mount(ProposalPage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.find('.sxVoteChoice').exists()).toBe(false)
   })
 
   it('keeps submit enabled when the lookup finds nothing', async () => {

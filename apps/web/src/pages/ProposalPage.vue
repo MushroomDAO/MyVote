@@ -75,6 +75,15 @@ const offchainClosed = computed(() =>
 )
 /** Explorer link for the indexed on-chain vote, when there is one. */
 const sxVoteLink = computed(() => sxTxUrl(sxProposal.value?.network, existingSxVote.value?.tx))
+/** The label of the option the indexed on-chain vote picked, when it maps. */
+const existingSxChoice = computed(() => {
+  const vote = existingSxVote.value
+  const choices = proposal.value?.choices
+  if (!vote || !choices) return null
+  const index = Number(vote.choice)
+  if (!Number.isInteger(index) || index < 1 || index > choices.length) return null
+  return choices[index - 1] ?? null
+})
 
 /** Whether the current proposal can be voted on right now. */
 const canVote = computed(() =>
@@ -530,6 +539,9 @@ onUnmounted(() => {
           {{ t('sxAlreadyVoted') }}
           <span v-if="existingSxVote && existingSxVote.vp !== null" class="sxVotePower">
             · {{ t('sxVotePower') }}: {{ existingSxVote.vp }}
+          </span>
+          <span v-if="existingSxChoice" class="sxVoteChoice">
+            · {{ t('sxYourChoice') }}: {{ existingSxChoice }}
           </span>
           <a v-if="sxVoteLink" class="sxVoteLink" :href="sxVoteLink" target="_blank" rel="noopener">
             {{ t('sxViewTx') }}
