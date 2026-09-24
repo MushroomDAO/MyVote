@@ -20,6 +20,7 @@ const PAGE_SIZE = 30
 const SX_PAGE_SIZE = 6
 // Namespaced by host so one tenant's spaces never serve another's cache.
 const CACHE_KEY = scopedCacheKey('explore:spaces')
+const SX_CACHE_KEY = scopedCacheKey('explore:sx-spaces')
 
 const guard = createRequestGuard()
 // The on-chain list loads in parallel and must not be cancelled by a paginated
@@ -38,6 +39,8 @@ const sxLoadingMore = ref(false)
 const sxHasMore = ref(false)
 /** True when the last on-chain list read failed (it is best-effort). */
 const sxFailed = ref(false)
+/** True when the on-chain list came from the 5-minute cache. */
+const sxCached = ref(false)
 
 const spaces = ref<Space[]>([])
 const loading = ref(false)
@@ -97,15 +100,32 @@ function loadMore() {
 
 function refresh() {
   cacheDelete(CACHE_KEY)
+  cacheDelete(SX_CACHE_KEY)
   void loadSpaces(0, true)
   // The on-chain card has no refresh of its own; refresh it with this button.
-  void loadSxSpaces(0)
+  void loadSxSpaces(0, true)
 }
 
 /** Best-effort: a failure here must not take down the off-chain Explore list. */
-async function loadSxSpaces(skip = 0) {
-  if (skip === 0) sxLoading.value = true
-  else sxLoadingMore.value = true
+async function loadSxSpaces(skip = 0, force = false) {
+  if (skip === 0) {
+    if (!force) {
+      const cached = cacheGet<SxSpace[]>(SX_CACHE_KEY)
+      if (cached) {
+        // The cache holds the raw lookahead page, so the flag stays exact.
+        const { page, hasMore: more } = takePage(cached, SX_PAGE_SIZE)
+        sxSpaces.value = page
+        sxHasMore.value = more
+        sxFailed.value = false
+        sxCached.value = true
+        return
+      }
+    }
+    sxCached.value = false
+    sxLoading.value = true
+  } else {
+    sxLoadingMore.value = true
+  }
   sxFailed.value = false
   const token = sxGuard.next()
   try {
@@ -119,6 +139,7 @@ async function loadSxSpaces(skip = 0) {
     const { page, hasMore: more } = takePage(raw, SX_PAGE_SIZE)
     sxSpaces.value = skip === 0 ? page : [...sxSpaces.value, ...page]
     sxHasMore.value = more
+    if (skip === 0) cacheSet(SX_CACHE_KEY, raw)
   } catch {
     if (sxGuard.isCurrent(token)) {
       if (skip === 0) sxSpaces.value = []
@@ -215,11 +236,12 @@ onUnmounted(() => {
     <section class="card onchainCard">
       <div class="cardHeader">
         <span class="muted">{{ t('onchainSpaces') }}</span>
+        <span v-if="sxCached && !sxLoading" class="cacheNote">{{ t('cached') }}</span>
       </div>
       <div v-if="sxLoading" class="placeholder">{{ t('loading') }}</div>
       <div v-else-if="sxFailed" class="error">
         {{ t('error') }}
-        <button class="retryBtn" type="button" @click="loadSxSpaces(0)">{{ t('retry') }}</button>
+        <button class="retryBtn" type="button" @click="loadSxSpaces(0, true)">{{ t('retry') }}</button>
       </div>
       <div v-else-if="sxSpaces.length === 0" class="placeholder">{{ t('empty') }}</div>
       <ul v-else class="list">
