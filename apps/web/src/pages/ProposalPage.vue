@@ -83,6 +83,20 @@ const voteResults = computed(() => {
   })
 })
 
+const PROPOSAL_TYPES: ProposalType[] = [
+  'single-choice',
+  'approval',
+  'quadratic',
+  'ranked-choice',
+  'weighted',
+  'basic'
+]
+
+/** SX reports a free-form type string; keep only ones we can render. */
+function toProposalType(type: string): ProposalType {
+  return (PROPOSAL_TYPES as string[]).includes(type) ? (type as ProposalType) : 'basic'
+}
+
 /** Adapts an indexed SX proposal to the shape the template renders. */
 function sxToProposal(sx: SxProposal): Proposal {
   return {
@@ -90,7 +104,7 @@ function sxToProposal(sx: SxProposal): Proposal {
     title: sx.title ?? sx.id,
     body: sx.body ?? '',
     choices: sx.choices,
-    type: 'basic',
+    type: toProposalType(sx.type),
     start: sx.start,
     end: sx.end,
     snapshot: sx.snapshot === null ? '' : String(sx.snapshot),
@@ -98,8 +112,8 @@ function sxToProposal(sx: SxProposal): Proposal {
     author: '',
     created: sx.start,
     votes: sx.voteCount,
-    scores: [],
-    scores_total: 0,
+    scores: sx.scores,
+    scores_total: sx.scoresTotal,
     space: { id: sx.space?.id ?? sxSpaceId.value ?? '', name: sx.space?.id ?? '' }
   }
 }

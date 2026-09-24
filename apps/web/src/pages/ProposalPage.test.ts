@@ -116,6 +116,9 @@ function sxProposal() {
     start: 1700000000,
     end: 1800000000,
     voteCount: 3,
+    type: 'basic',
+    scores: [3, 0],
+    scoresTotal: 3,
     strategies: [{ index: 0, address: '0x34f0AfFF5A739bBf3E285615F50e40ddAaf2A829', params: '0x' }],
     space: {
       id: SX_SPACE,
@@ -183,6 +186,8 @@ describe('ProposalPage Snapshot X', () => {
 
     expect(wrapper.text()).toContain('SX Title')
     expect(wrapper.text()).toContain('ONCHAIN')
+    // Results render from the indexed scores (3 / 3 = 100%).
+    expect(wrapper.text()).toContain('100.0%')
     expect(fetchSxProposal).toHaveBeenCalledWith(expect.any(String), SX_SPACE + '/12')
     // The off-chain Hub must not be consulted for an SX space.
     expect(fetchProposal).not.toHaveBeenCalled()
