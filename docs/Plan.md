@@ -73,9 +73,13 @@
 - [x] **M5-1 signer 适配**：`createEthersCompatSigner` 把 viem 形状的 `signTypedData`
       桥接为 ethers v5 的 `_signTypedData`；viem 保留在应用层
 - [x] **M5-1 路由启发式**：`lib/voteRouting.ts` `protocolForSpaceId`（`0x…` → SX，ENS → 链下）
-- [ ] **M5-2 接线**：ProposalPage / 新页面按 `protocolForSpaceId` 选择后端；
-      需先决定 ethers `Provider` 来源（新增 `@ethersproject/providers`，或包装 EIP-1193）
-- [ ] 读路径接 `apps/api`（`api.snapshot.box`）；**新增**而非替换链下 Hub
+- [x] **M5-2 provider 适配**：`lib/sx/provider.ts` 把注入的 EIP-1193（`window.ethereum`）
+      包装成 sx.js 需要的 ethers Provider 形状（`call/getNetwork/getBlockNumber/getCode/
+      getStorageAt/getTransactionCount/getBalance/getLogs`），不引入 `@ethersproject/providers`；
+      `createSxBackendFromEip1193` 组合 provider + 后端
+- [ ] **M5-3 SX 读路径**：接 `apps/api`（`api.snapshot.box`）拿 SX space / proposal /
+      authenticator / strategies（**新增**而非替换链下 Hub）——页面接线的前置条件
+- [ ] **M5-3 页面接线**：ProposalPage 按 `protocolForSpaceId` 选择后端并渲染 SX 投票
 - [ ] 在一个真实 SX space（优先 Optimism）上做端到端验证
 
 ### M6 — 自助注册安全加固与多租户运维
