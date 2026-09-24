@@ -6,12 +6,14 @@ type GraphQLResponse<TData> = {
 export async function graphqlRequest<TData>(
   endpoint: string,
   query: string,
-  variables?: Record<string, unknown>
+  variables?: Record<string, unknown>,
+  signal?: AbortSignal
 ): Promise<TData> {
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ query, variables })
+    body: JSON.stringify({ query, variables }),
+    signal
   })
 
   if (!res.ok) {
@@ -70,7 +72,13 @@ export type Proposal = {
   space: { id: string; name: string }
 }
 
-export async function fetchSpaces(endpoint: string, params: { first: number; skip: number }) {
+export async function fetchSpaces(
+  endpoint: string,
+  params: { first: number; skip: number; signal?: AbortSignal }
+) {
+  // `signal` belongs to the transport, not the GraphQL variables map, so pull
+  // it out here.
+  const { signal, ...variables } = params
   return graphqlRequest<{ spaces: Space[] }>(
     endpoint,
     `
@@ -84,14 +92,16 @@ export async function fetchSpaces(endpoint: string, params: { first: number; ski
         }
       }
     `,
-    params
+    variables,
+    signal
   )
 }
 
 export async function fetchSpaceWithProposals(
   endpoint: string,
-  params: { spaceId: string; first: number; skip: number }
+  params: { spaceId: string; first: number; skip: number; signal?: AbortSignal }
 ) {
+  const { signal, ...variables } = params
   return graphqlRequest<{ space: Space | null; proposals: ProposalListItem[] }>(
     endpoint,
     `
@@ -117,11 +127,16 @@ export async function fetchSpaceWithProposals(
         }
       }
     `,
-    params
+    variables,
+    signal
   )
 }
 
-export async function fetchProposal(endpoint: string, params: { proposalId: string }) {
+export async function fetchProposal(
+  endpoint: string,
+  params: { proposalId: string; signal?: AbortSignal }
+) {
+  const { signal, ...variables } = params
   return graphqlRequest<{ proposal: Proposal | null }>(
     endpoint,
     `
@@ -148,6 +163,7 @@ export async function fetchProposal(endpoint: string, params: { proposalId: stri
         }
       }
     `,
-    params
+    variables,
+    signal
   )
 }

@@ -51,6 +51,16 @@ describe('graphqlRequest', () => {
     stubFetch({})
     await expect(graphqlRequest('https://hub.test/graphql', 'q')).rejects.toThrow(/Missing GraphQL data/)
   })
+
+  it('forwards an abort signal to fetch', async () => {
+    const fetchImpl = stubFetch({ data: { ok: true } })
+    const controller = new AbortController()
+
+    await graphqlRequest('https://hub.test/graphql', 'q', undefined, controller.signal)
+
+    const init = fetchImpl.mock.calls[0]![1] as RequestInit
+    expect(init.signal).toBe(controller.signal)
+  })
 })
 
 describe('query wrappers', () => {
@@ -77,5 +87,21 @@ describe('query wrappers', () => {
     await expect(
       fetchProposal('https://hub.test/graphql', { proposalId: '0x1' })
     ).resolves.toEqual({ proposal: { id: '0x1', title: 'T' } })
+  })
+
+  it('keeps the signal out of the GraphQL variables', async () => {
+    const fetchImpl = stubFetch({ data: { proposal: { id: '0x1' } } })
+    const controller = new AbortController()
+
+    await fetchProposal('https://hub.test/graphql', {
+      proposalId: '0x1',
+      signal: controller.signal
+    })
+
+    const init = fetchImpl.mock.calls[0]![1] as RequestInit
+    expect(init.signal).toBe(controller.signal)
+    // A signal has no enumerable fields, so leaking it would send `signal: {}`
+    // to the hub — an undeclared variable.
+    expect(JSON.parse(init.body as string).variables).toEqual({ proposalId: '0x1' })
   })
 })

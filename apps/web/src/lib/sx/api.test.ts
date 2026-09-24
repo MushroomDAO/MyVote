@@ -136,7 +136,7 @@ describe('sxGraphqlRequest', () => {
       'https://api.example',
       'query { ok }',
       { a: 1 },
-      fetchImpl as unknown as typeof fetch
+      { fetchImpl: fetchImpl as unknown as typeof fetch }
     )
     expect(data).toEqual({ ok: true })
 
@@ -145,12 +145,40 @@ describe('sxGraphqlRequest', () => {
     expect(JSON.parse(init.body as string)).toEqual({ query: 'query { ok }', variables: { a: 1 } })
   })
 
+  it('forwards the abort signal to the transport', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ data: { ok: true } }))
+    const controller = new AbortController()
+    await sxGraphqlRequest('https://api.example', 'q', {}, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      signal: controller.signal
+    })
+    expect((fetchImpl.mock.calls[0]![1] as RequestInit).signal).toBe(controller.signal)
+  })
+
+  it('rejects with the transport abort when the caller cancels', async () => {
+    const controller = new AbortController()
+    const fetchImpl = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError'))
+          )
+        })
+    )
+    const pending = sxGraphqlRequest('https://api.example', 'q', {}, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      signal: controller.signal
+    })
+    controller.abort()
+    await expect(pending).rejects.toThrow(/Aborted/)
+  })
+
   it('surfaces GraphQL errors', async () => {
     const fetchImpl = vi
       .fn()
       .mockResolvedValue(jsonResponse({ errors: [{ message: 'boom' }] }))
     await expect(
-      sxGraphqlRequest('https://api.example', 'q', {}, fetchImpl as unknown as typeof fetch)
+      sxGraphqlRequest('https://api.example', 'q', {}, { fetchImpl: fetchImpl as unknown as typeof fetch })
     ).rejects.toThrow(/boom/)
   })
 
@@ -166,7 +194,7 @@ describe('sxGraphqlRequest', () => {
       'https://api.example',
       'q',
       {},
-      fetchImpl as unknown as typeof fetch
+      { fetchImpl: fetchImpl as unknown as typeof fetch }
     )
     expect(data.spaces).toHaveLength(1)
   })
@@ -174,7 +202,7 @@ describe('sxGraphqlRequest', () => {
   it('surfaces a non-JSON response', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response('<html>', { status: 502 }))
     await expect(
-      sxGraphqlRequest('https://api.example', 'q', {}, fetchImpl as unknown as typeof fetch)
+      sxGraphqlRequest('https://api.example', 'q', {}, { fetchImpl: fetchImpl as unknown as typeof fetch })
     ).rejects.toThrow(/non-JSON/)
   })
 })
@@ -182,7 +210,7 @@ describe('sxGraphqlRequest', () => {
 describe('fetchers', () => {
   it('fetchSxSpace targets the space query and maps the result', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ data: { space: SPACE_WIRE } }))
-    const space = await fetchSxSpace('https://api.example', SPACE_WIRE.id, fetchImpl as unknown as typeof fetch)
+    const space = await fetchSxSpace('https://api.example', SPACE_WIRE.id, { fetchImpl: fetchImpl as unknown as typeof fetch })
     expect(space?.name).toBe('Ryu0x167 Space Command')
     expect(JSON.parse((fetchImpl.mock.lastCall![1] as RequestInit).body as string).query).toBe(SX_SPACE_QUERY)
   })
@@ -192,8 +220,7 @@ describe('fetchers', () => {
     const proposals = await fetchSxProposals(
       'https://api.example',
       SPACE_WIRE.id,
-      { first: 5, skip: 10 },
-      fetchImpl as unknown as typeof fetch
+      { first: 5, skip: 10, fetchImpl: fetchImpl as unknown as typeof fetch }
     )
     expect(proposals[0]!.proposalId).toBe(12)
     const body = JSON.parse((fetchImpl.mock.lastCall![1] as RequestInit).body as string)
@@ -205,8 +232,7 @@ describe('fetchers', () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ data: { spaces: [SPACE_WIRE] } }))
     const spaces = await fetchSxSpaces(
       'https://api.example',
-      { first: 3, skip: 6 },
-      fetchImpl as unknown as typeof fetch
+      { first: 3, skip: 6, fetchImpl: fetchImpl as unknown as typeof fetch }
     )
 
     expect(spaces).toHaveLength(1)
@@ -220,7 +246,7 @@ describe('fetchers', () => {
     const proposal = await fetchSxProposal(
       'https://api.example',
       PROPOSAL_WIRE.id,
-      fetchImpl as unknown as typeof fetch
+      { fetchImpl: fetchImpl as unknown as typeof fetch }
     )
     expect(proposal?.space?.id).toBe(SPACE_WIRE.id)
     expect(JSON.parse((fetchImpl.mock.lastCall![1] as RequestInit).body as string).query).toBe(SX_PROPOSAL_QUERY)
