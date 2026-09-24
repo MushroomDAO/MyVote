@@ -77,10 +77,13 @@
       包装成 sx.js 需要的 ethers Provider 形状（`call/getNetwork/getBlockNumber/getCode/
       getStorageAt/getTransactionCount/getBalance/getLogs`），不引入 `@ethersproject/providers`；
       `createSxBackendFromEip1193` 组合 provider + 后端
-- [ ] **M5-3 SX 读路径**：接 `apps/api`（`api.snapshot.box`）拿 SX space / proposal /
-      authenticator / strategies（**新增**而非替换链下 Hub）——页面接线的前置条件
-- [ ] **M5-3 页面接线**：ProposalPage 按 `protocolForSpaceId` 选择后端并渲染 SX 投票
-- [ ] 在一个真实 SX space（优先 Optimism）上做端到端验证
+- [x] **M5-3 SX 读路径**：`lib/sx/api.ts` 接 `api.snapshot.box`（space / proposals / proposal+space），
+      含 `zipStrategies`、`toSxSpace`/`toSxProposal`、`buildSxVoteRequest` 与错误处理；
+      **已在真实 Optimism space 上 live 验证**：
+      `SX_LIVE=1 vitest run src/lib/sx/api.test.ts` → Ryu0x167 Space Command
+      `0x03C7431e14F7b759Aa44398AD7901e6053c197Bf`（_indexer `oeth`）
+- [ ] **M5-4 页面接线**：ProposalPage 按 `protocolForSpaceId` 选择后端并渲染 SX 投票
+- [ ] 在真实 SX space 上完成一次真实投票（需要投票权 + 钱包；Ryu0x167 可作为目标）
 
 ### M6 — 自助注册安全加固与多租户运维
 
