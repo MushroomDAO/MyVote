@@ -4,11 +4,21 @@ import {
   createEthersCompatSigner,
   createSnapshotXEvmBackend,
   primaryTypeOf,
+  sxNetworkLabel,
   SX_MANA_URL,
   SX_WHITELIST_URL,
   type SxClient,
   type SxVoteRequest
 } from './backend'
+
+describe('sxNetworkLabel', () => {
+  it('maps network ids to labels, and null to null', () => {
+    expect(sxNetworkLabel('optimism')).toBe('Optimism')
+    expect(sxNetworkLabel('base')).toBe('Base')
+    expect(sxNetworkLabel(null)).toBeNull()
+    expect(sxNetworkLabel(undefined)).toBeNull()
+  })
+})
 
 describe('primaryTypeOf', () => {
   it('returns the first non-domain struct', () => {

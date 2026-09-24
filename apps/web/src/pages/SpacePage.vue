@@ -7,6 +7,7 @@ import { GRAPHQL_ENDPOINT, SX_API_ENDPOINT } from '../config'
 import { fetchSpaceWithProposals, type ProposalListItem, type Space } from '../lib/graphql'
 import { createRequestGuard } from '../lib/requestGuard'
 import { fetchSxProposals, fetchSxSpace, type SxProposal } from '../lib/sx/api'
+import { sxNetworkLabel } from '../lib/sx/backend'
 import { protocolForSpaceId } from '../lib/voteRouting'
 
 const { t, locale } = useI18n()
@@ -26,6 +27,8 @@ const error = ref<string | null>(null)
 const hasMore = ref(true)
 /** True when the current space is a Snapshot X (on-chain) space. */
 const isSx = ref(false)
+/** On-chain-only details (network + proposal count), when applicable. */
+const sxMeta = ref<{ network: string | null; proposalCount: number } | null>(null)
 
 const dtf = computed(
   () =>
@@ -53,6 +56,7 @@ async function loadSpace(skip: number) {
     loading.value = true
     space.value = null
     proposals.value = []
+    sxMeta.value = null
   } else {
     loadingMore.value = true
   }
@@ -71,6 +75,9 @@ async function loadSpace(skip: number) {
 
       space.value = sxSpace
         ? { id: sxSpace.id, name: sxSpace.name ?? sxSpace.id, about: sxSpace.about ?? undefined }
+        : null
+      sxMeta.value = sxSpace
+        ? { network: sxNetworkLabel(sxSpace.network), proposalCount: sxSpace.proposalCount }
         : null
       const items = page.map(sxListItem)
       proposals.value = skip === 0 ? items : [...proposals.value, ...items]
@@ -155,7 +162,16 @@ onMounted(() => {
         <div class="id">{{ space.id }}</div>
       </div>
 
+      <div v-if="isSx" class="chips">
+        <span class="chip">{{ t('sxOnchain') }}</span>
+      </div>
+
       <div v-if="space.about" class="about">{{ space.about }}</div>
+
+      <div v-if="sxMeta" class="sxMeta">
+        {{ t('network') }}: {{ sxMeta.network ?? '—' }} · {{ t('proposals') }}:
+        {{ sxMeta.proposalCount }}
+      </div>
 
       <div class="sectionTitle">{{ t('proposals') }}</div>
       <div v-if="proposals.length === 0" class="muted">{{ t('empty') }}</div>
@@ -220,6 +236,26 @@ onMounted(() => {
 .id {
   font-size: 12px;
   color: var(--mv-muted-sm);
+}
+
+.chips {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.chip {
+  border: 1px solid var(--mv-border-md);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--mv-muted);
+}
+
+.sxMeta {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--mv-muted);
 }
 
 .about {

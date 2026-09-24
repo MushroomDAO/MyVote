@@ -28,6 +28,19 @@ export const SX_EVM_CHAIN_IDS: Record<SxEvmNetworkId, number> = {
   sepolia: 11155111
 }
 
+/** Human-readable labels for the supported networks. */
+export const SX_NETWORK_LABELS: Record<SxEvmNetworkId, string> = {
+  ethereum: 'Ethereum',
+  optimism: 'Optimism',
+  arbitrum: 'Arbitrum',
+  base: 'Base',
+  sepolia: 'Sepolia'
+}
+
+export function sxNetworkLabel(id: SxEvmNetworkId | null | undefined): string | null {
+  return id ? SX_NETWORK_LABELS[id] : null
+}
+
 /**
  * Config for the SX EVM client.
  *
