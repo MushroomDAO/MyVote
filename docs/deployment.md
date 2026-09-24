@@ -70,9 +70,35 @@ apps/web/scripts/deploy-preview.sh [branch]   # 默认 dev
 KV 中只存加盐 SHA-256（`ec:<email>`），明文只出现在邮件里。发送结果区分「Resend 明确拒绝」（可重试，502）
 与「结果未知」（可能已发出，保留验证码并返回 202），见 `src/lib/resend.ts`。
 
-**preview**：只有非敏感的 `CF_ROOT_DOMAIN`、`SNAPSHOT_HUB`。
-> 预览环境**刻意不配置 CF 密钥**：这样预览里的注册请求不会真的去开通 Pages 自定义域名。
-> 预览同样不配 `RESEND_API_KEY`，因此 `/api/email-code` 返回 503，注册流程保持开放。
+**preview**（2026-09-24 起已配置）**：**`CF_ROOT_DOMAIN`、`SNAPSHOT_HUB`、`RESEND_API_KEY`、`EMAIL_CODE_SECRET`。
+> 预览仍**刻意不配置 CF 密钥**（`CF_API_TOKEN` 等）：预览里的注册不会真的去开通 Pages 自定义域名。
+> 但预览**已经开启邮箱验证码**，所以 `/api/email-code` 会真实发信、`/api/register` 会强制校验验证码。
+
+**如何按环境配置 Pages 变量（CLI 没有 preview 作用域，得用 API）**：
+
+```bash
+# 1) 取 wrangler 的 OAuth token（本机已登录；不要打印它）
+#    ~/Library/Preferences/.wrangler/config/default.toml 里的 oauth_token
+# 2) 读当前配置
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/pages/projects/myvote"
+# 3) PATCH 只动目标环境；PATCH 是合并语义，删变量要把值设为 null
+```
+
+要点（都是实测踩过的）：
+
+- 变量对象形状是 `{ "value": "…", "type": "plain_text" | "secret_text" }`——**secret 的类型叫 `secret_text`**，
+  写 `"secret"` 会得到 HTTP 500 `unknown error`。
+- `PATCH` 是**合并**：只发要改/新增的键即可，不发的键保留；删除某个键要显式发 `"KEY": null`。
+- 改完变量需要**重新部署**才生效（`deploy-preview.sh dev` / 生产部署）。
+- `EMAIL_FROM` 不配也行：`functions/api/email-code.ts` 的默认值就是 `hello@idoris.ai`。
+- 生产作用域可以直接用 `cat secret.txt | npx wrangler pages secret put RESEND_API_KEY --project-name myvote`
+  （逐键 upsert，不会碰其它变量）。**生产已配置** `RESEND_API_KEY` + `EMAIL_CODE_SECRET`，
+  但要等下一次生产部署才生效（那之前生产注册仍是开放的）。
+
+**2026-09-24 预览实测**：`POST /api/email-code` → 200，真实从 `hello@idoris.ai` 发出；一次性邮箱收到 6 位码；
+错误码 → 400 `email_code_mismatch`；正确码 → 200（`domainStatus: unmanaged`）。
+
 **本地验证邮箱验证码（M6-3）**：
 
 用 `wrangler pages dev -b` 注入密钥，不落盘（因此也不会有被误提交的 `.dev.vars`）：
@@ -92,13 +118,8 @@ npx -y wrangler@4 pages dev dist --port 8799 --ip 127.0.0.1 \
 本地没有 `CF_API_TOKEN`，成功响应里 `domainStatus` 为 `unmanaged`。
 （2026-09-24 实测：`hello@idoris.ai` 真实发出、收到 6 位码、错误码 400 `email_code_mismatch`、正确码 200。）
 
-**「本地能发、线上发不了」是两回事（常见疑问）**：上一次成功的发送发生在**本地** `wrangler pages dev`，
-密钥是我用 `-b RESEND_API_KEY=…` 从 `~/Dev/.env`（那把 key 早就有）注入到**本地进程**的。
-部署在 Cloudflare 上的预览/生产项目**没有配置这个变量**，所以线上 `/api/email-code` 返回 503
-`email_verification_unavailable`（注册保持开放）。缺的不是 key，而是「在 CF 项目上配置它」这一步。
-> ⚠️ **密钥作用域**：`wrangler pages secret put` 写的是 **production** 作用域——一旦设置，
-> 生产注册就会强制要求验证码。只想在 **preview** 开启，必须在 CF 控制台 → Pages 项目 →
-> Settings → Variables and Secrets 的 **Preview** 环境里单独设置；CLI 没有 preview 作用域选项。
+> ⚠️ **密钥作用域**：`wrangler pages secret put` 写的是 **production** 作用域。要在 preview 生效，
+> 用上面那段 API 的 `deployment_configs.preview.env_vars`（CLI 没有 preview 作用域选项）。
 
 前端构建期变量（`VITE_*`）见 `apps/web/.env.example`。
 

@@ -158,9 +158,12 @@
       按 IP + 邮箱双限流），KV 只存加盐 SHA-256；`/api/register` 在 `RESEND_API_KEY` 存在时
       **强制校验**验证码。**2026-09-24 本地全链路 live 验证**：真实从 `hello@idoris.ai` 发出、
       一次性邮箱收到码、错误码 400 `email_code_mismatch`、正确码 200。
-      _注意：`wrangler pages secret put` 只能写 **production** 作用域，无法只给 preview 配 key；
-      preview/生产的开启需要在 CF 控制台按环境设置，故本次用 `wrangler pages dev` + `-b` 本地验证。
-      复现见 [`docs/deployment.md`](./deployment.md) §4。_
+      _2026-09-24 已自行配置 Cloudflare 变量并**在部署后的预览上复测通过**：`POST /api/email-code` 200、
+      真实收码、错误码 400、正确码 200。关键：`wrangler pages secret put` 只写 **production** 作用域，
+      preview 要用 CF API 的 `deployment_configs.preview.env_vars`，且 secret 的 `type` 是 **`secret_text`**
+      （写 `secret` 会 500）；`PATCH` 是合并语义，删键要显式发 `null`。命令见
+      [`docs/deployment.md`](./deployment.md) §4。生产侧的 `RESEND_API_KEY` / `EMAIL_CODE_SECRET` 已配好，
+      但要等下一次生产部署才生效。_
 - [ ] **更强身份（可选）**：钱包对注册请求签名已支持（见下条 `adminSignature`）；
       cos72 登录态作为身份来源待外部就绪。
 - [x] **Snapshot 空间所有权校验**（非破坏式）：可选 `adminSignature`/`adminAddress`/`adminTimestamp`；
