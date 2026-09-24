@@ -87,8 +87,10 @@ describe('wrapEip1193', () => {
 
 describe('createSxBackendFromEip1193', () => {
   it('wraps the wallet and hands the SX client a wrapped provider', async () => {
-    const vote = vi.fn().mockResolvedValue({ id: 'sx' })
-    const loadSxClient = vi.fn().mockResolvedValue({ vote } as unknown as SxClient)
+    const envelope = { signatureData: {}, data: {} }
+    const vote = vi.fn().mockResolvedValue(envelope)
+    const send = vi.fn().mockResolvedValue({ id: 'sx' })
+    const loadSxClient = vi.fn().mockResolvedValue({ vote, send } as unknown as SxClient)
     const backend = createSxBackendFromEip1193({
       network: 'optimism',
       eip1193: fakeEip1193({}),
@@ -112,6 +114,7 @@ describe('createSxBackendFromEip1193', () => {
       }
     )
 
+    expect(send).toHaveBeenCalledWith(envelope)
     expect(loadSxClient).toHaveBeenCalledWith(
       expect.objectContaining({
         network: 'optimism',

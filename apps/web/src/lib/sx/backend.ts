@@ -102,7 +102,10 @@ export type SxVoteRequest = {
 
 /** The slice of sx.js `EvmEthereumSig` this module uses. */
 export type SxClient = {
+  /** Produces the signed EIP-712 envelope. It does not submit anything. */
   vote(args: { signer: SxSigner; data: SxVoteRequest }): Promise<unknown>
+  /** Relays a signed envelope to the Mana meta-transaction relayer. */
+  send(envelope: unknown): Promise<unknown>
 }
 
 export type LoadSxClient = (config: ResolvedSxEvmConfig) => Promise<SxClient>
@@ -187,7 +190,12 @@ export function createSnapshotXEvmBackend(options: {
       // Lazily create and memoise: the SDK is fetched at most once.
       client ??= load(config)
       const sxClient = await client
-      return sxClient.vote({ signer, data: { ...request } })
+      const envelope = await sxClient.vote({ signer, data: { ...request } })
+      // sx.js `vote()` stops at the signed envelope; `send()` performs the
+      // relayer call, so the vote stays unsent without it.
+      const receipt = await sxClient.send(envelope)
+      if (receipt === undefined) throw new Error('SX relayer returned no result')
+      return receipt
     }
   }
 }
