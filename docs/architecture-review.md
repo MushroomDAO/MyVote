@@ -2,6 +2,31 @@
 
 > 由 claude-planner 于仓库只读分析时产出。本文档仅记录事实，未做任何代码改动。
 
+---
+
+## 📌 2026-09 复核（自主迭代后）
+
+下方为当时的**只读快照**，保留原样。其中多数条目已在此后的迭代中修复，现状如下——**请勿再按未修复状态跟进**：
+
+| 原条目 | 现状 |
+|---|---|
+| `CLAUDE.md` 过时（测试运行器 / hub / 组件缺失） | ✅ 已重写（含 Functions、错误码、默认 testnet hub、环境变量表） |
+| M2 文档清单未勾选、`tenants.json` 描述过时 | ✅ M2 文档按 KV + 自助注册重写；`apps/web/tenants.json` 已删除 |
+| `POST /api/register` 无鉴权 / 限流 | 🟡 已加按 IP 限流（#11）与**空间所有权校验**（#20）；验证码/身份待邮箱服务（M6-3） |
+| 注册 TOCTOU 竞态 | 🟡 写入 reservation 后读回确认（#11）；彻底修复需 Durable Objects（KV 无 CAS） |
+| `_middleware` 注入 `__TENANT__` 未转义 `<` | ✅ `escapeForScript`（#11） |
+| `register.ts` 吞掉 CF 域名注册失败 | ✅ 失败**回滚 KV 并返回 502**（#14），成功/未托管写入 `domainStatus` |
+| 读取路径无取消 / 去重 | ✅ 过期响应令牌守卫（#6）；`AbortController` 仍为可选未做 |
+| 投票后不失效缓存 | ✅ Explore 缓存按 host 隔离（#7）；投票数据不在该缓存中，暂无需失效 |
+| 读取路径零测试 | ✅ `lib/graphql.ts`、`lib/sx/*`、页面竞态与协议分流均有测试；Functions 三路由均有端点测试（#14/#29/#30） |
+| 错误信息硬编码中文 | ✅ 投票路径与 auth/SSO 路径均改为**稳定错误码 + i18n**（#10/#19） |
+| AirAccount 签名未实现 / SSO token 存 sessionStorage | ⏸ 仍阻塞于 E-5 KMS 与 cos72 落地页 |
+| `v-html` XSS 面 | ✅ 维持 DOMPurify 已缓解（未变） |
+
+> 评审时尚未存在、现已具备的能力：**多后端投票**（链下默认 + 可选 Snapshot X EVM/OP）、Explore 链上空间发现、注册自助流程与所有权校验。
+
+---
+
 ## 一、架构（Architecture）
 
 **技术栈：** Vue 3（Composition API、`<script setup>`）+ TypeScript，Vite 构建，Vue Router 4，vue-i18n，Vitest 测试。没有状态管理库，用 `ref`/`computed` 单例代替。后端完全外部化：Snapshot Hub GraphQL + 投票接收 sequencer，外加一组 Cloudflare Pages Functions 用于多租户。
