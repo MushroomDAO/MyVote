@@ -36,8 +36,8 @@ export const SX_PROPOSALS_QUERY =
 
 export const SX_PROPOSAL_QUERY =
   'query Proposal($id: String!) { proposal(id: $id) { ' +
-  'id proposal_id metadata { title body choices } state snapshot start min_end max_end ' +
-  'scores_total vote_count _indexer ' +
+  'id proposal_id type metadata { title body choices } state snapshot start min_end max_end ' +
+  'scores_1_parsed scores_2_parsed scores_3_parsed scores_total_parsed vote_count _indexer ' +
   STRATEGY_FIELDS +
   ' space { id authenticators ' + STRATEGY_FIELDS + ' } ' +
   ' } }'
@@ -59,13 +59,18 @@ export type SxSpaceWire = {
 export type SxProposalWire = {
   id: string
   proposal_id: string
+  type: string
   metadata: { title: string | null; body: string | null; choices: string[] } | null
   state: string
   snapshot: string | null
   start: string
   min_end: string
   max_end: string
-  scores_total: string | null
+  /** Per-choice scores; the indexer exposes up to three choices. */
+  scores_1_parsed: number | null
+  scores_2_parsed: number | null
+  scores_3_parsed: number | null
+  scores_total_parsed: number | null
   vote_count: number
   _indexer: string
   strategies_indices: number[]
@@ -108,6 +113,8 @@ export type SxProposal = {
   id: string
   proposalId: number
   network: SxEvmNetworkId | null
+  /** SX proposal type, e.g. `basic` (see sx.js vote types). */
+  type: string
   title: string | null
   body: string | null
   choices: string[]
@@ -115,6 +122,9 @@ export type SxProposal = {
   snapshot: number | null
   start: number
   end: number
+  /** Per-choice scores (the indexer exposes up to three). */
+  scores: number[]
+  scoresTotal: number
   voteCount: number
   strategies: SxStrategyConfig[]
   /** Present when the proposal was fetched with its space (single-proposal query). */
@@ -156,6 +166,7 @@ export function toSxProposal(wire: SxProposalWire): SxProposal {
     id: wire.id,
     proposalId: Number.parseInt(wire.proposal_id, 10),
     network: sxNetworkFromIndexer(wire._indexer),
+    type: wire.type ?? 'basic',
     title: wire.metadata?.title ?? null,
     body: wire.metadata?.body ?? null,
     choices: wire.metadata?.choices ?? [],
@@ -163,6 +174,12 @@ export function toSxProposal(wire: SxProposalWire): SxProposal {
     snapshot: wire.snapshot === null ? null : Number.parseInt(wire.snapshot, 10),
     start: Number.parseInt(wire.start, 10),
     end: Number.parseInt(wire.min_end, 10),
+    scores: [
+      wire.scores_1_parsed ?? 0,
+      wire.scores_2_parsed ?? 0,
+      wire.scores_3_parsed ?? 0
+    ],
+    scoresTotal: wire.scores_total_parsed ?? 0,
     voteCount: wire.vote_count ?? 0,
     strategies: zipStrategies(wire.strategies_indices, wire.strategies, wire.strategies_params),
     space: wire.space

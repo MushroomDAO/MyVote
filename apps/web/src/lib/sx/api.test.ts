@@ -34,13 +34,17 @@ const SPACE_WIRE: SxSpaceWire = {
 const PROPOSAL_WIRE: SxProposalWire = {
   id: '0x03C7431e14F7b759Aa44398AD7901e6053c197Bf/12',
   proposal_id: '12',
+  type: 'basic',
   metadata: { title: 'Active 1', body: '', choices: ['For', 'Against', 'Abstain'] },
   state: 'closed',
   snapshot: '125246602',
   start: '1726091981',
   min_end: '1726092101',
   max_end: '1726095581',
-  scores_total: '3',
+  scores_1_parsed: 3,
+  scores_2_parsed: 0,
+  scores_3_parsed: 0,
+  scores_total_parsed: 3,
   vote_count: 3,
   _indexer: 'oeth',
   strategies_indices: [0],
@@ -81,6 +85,10 @@ describe('mappers', () => {
     expect(proposal.start).toBe(1726091981)
     expect(proposal.end).toBe(1726092101)
     expect(proposal.space?.authenticators).toHaveLength(1)
+    // Results render from the parsed per-choice scores.
+    expect(proposal.type).toBe('basic')
+    expect(proposal.scores).toEqual([3, 0, 0])
+    expect(proposal.scoresTotal).toBe(3)
   })
 })
 
