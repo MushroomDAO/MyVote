@@ -19,16 +19,60 @@ type TenantConfig = {
   colors?: Partial<typeof branding.colors>
 }
 
-const injected = (window as unknown as { __TENANT__?: TenantConfig }).__TENANT__
+type ColorKey = keyof typeof branding.colors
 
-/** Raw tenant config injected by the edge function, or empty object in standalone mode. */
-export const tenant: TenantConfig = injected ?? {}
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+/**
+ * Picks only the known tenant fields out of whatever the edge injected.
+ *
+ * \`window.__TENANT__\` is attacker-influenced in the sense that it comes from a KV
+ * record an admin controls; a malformed value (a string, a number) would
+ * otherwise be *spread* into the branding object and produce junk. Unknown keys
+ * are dropped, and non-string color values are ignored.
+ */
+export function normalizeTenant(raw: unknown): TenantConfig {
+  if (!isRecord(raw)) return {}
+
+  const config: TenantConfig = {}
+  if (typeof raw.spaceId === 'string') config.spaceId = raw.spaceId
+  if (typeof raw.name === 'string') config.name = raw.name
+  // `null` is meaningful: it means "no logo" (render the name as text).
+  if (typeof raw.logo === 'string' || raw.logo === null) config.logo = raw.logo
+  if (typeof raw.description === 'string') config.description = raw.description
+
+  if (isRecord(raw.colors)) {
+    const colors: Partial<typeof branding.colors> = {}
+    for (const key of ['primary', 'primaryHover', 'error', 'selectedBg'] as ColorKey[]) {
+      const value = raw.colors[key]
+      if (typeof value === 'string') colors[key] = value
+    }
+    if (Object.keys(colors).length) config.colors = colors
+  }
+
+  return config
+}
 
 /** Branding merged with tenant overrides. Use this everywhere instead of branding directly. */
-export const resolvedBranding = {
-  ...branding,
-  ...(tenant.name != null ? { name: tenant.name } : {}),
-  ...(tenant.logo !== undefined ? { logo: tenant.logo } : {}),
-  ...(tenant.description != null ? { description: tenant.description } : {}),
-  colors: { ...branding.colors, ...tenant.colors },
+export function mergeBranding(
+  base: typeof branding,
+  overrides: TenantConfig
+): typeof branding {
+  return {
+    ...base,
+    ...(overrides.name != null ? { name: overrides.name } : {}),
+    ...(overrides.logo !== undefined ? { logo: overrides.logo } : {}),
+    ...(overrides.description != null ? { description: overrides.description } : {}),
+    colors: { ...base.colors, ...(overrides.colors ?? {}) }
+  }
 }
+
+const injected = (window as unknown as { __TENANT__?: unknown }).__TENANT__
+
+/** Raw tenant config injected by the edge function, or empty object in standalone mode. */
+export const tenant: TenantConfig = normalizeTenant(injected)
+
+/** Branding with tenant overrides applied. */
+export const resolvedBranding = mergeBranding(branding, tenant)
