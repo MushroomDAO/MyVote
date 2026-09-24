@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { isValidEmail } from '../lib/email'
+import { isValidSubdomain } from '../lib/registration'
 
 const { t } = useI18n()
 
@@ -20,7 +21,7 @@ const submitError = ref<string | null>(null)
 const successUrl = ref<string | null>(null)
 
 const nameLower = computed(() => name.value.toLowerCase().trim())
-const isValidName = computed(() => /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(nameLower.value))
+const isValidName = computed(() => isValidSubdomain(nameLower.value))
 const isEmailValid = computed(() => isValidEmail(email.value))
 
 let checkTimer: ReturnType<typeof setTimeout> | null = null

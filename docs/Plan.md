@@ -76,10 +76,14 @@
 
 ### M6 — 自助注册安全加固与多租户运维
 
-- [ ] `POST /api/register` 加鉴权 + 按 IP 限流 + 验证码。
-- [ ] 验证 Snapshot 空间所有权（防止抢注他人 spaceId）。
-- [ ] 修 TOCTOU 竞态（`KV.get` 判重 → `KV.put`），改用原子写入或锁。
-- [ ] `_middleware.ts` 注入 `__TENANT__` 时转义 `<`。
+- [x] 按 IP 限流：`register` 5/时、`check` 120/分（KV 固定窗口，尽力而为，见 `lib/rateLimit.ts`）。
+- [x] 校验 `spaceId` 格式（ENS / Snapshot X hex），拒绝空白与分隔符。
+- [x] `_middleware.ts` 注入 `__TENANT__` 前经 `escapeForScript` 转义 `<` 与 U+2028/2029。
+- [x] 缩小 TOCTOU 竞态：写入随机 reservation 后读回确认，败者返回 409。
+      _彻底修复需 Durable Objects（KV 无 CAS）——记为残余风险。_
+- [ ] **鉴权 / 验证码**：注册者身份目前仅前端声明的邮箱，服务端不可信。需产品决策
+      （邮箱验证码 / cos72 登录态 / 钱包对注册请求签名）。
+- [ ] **Snapshot 空间所有权校验**：防止抢注他人 spaceId。需产品决策（签名消息 / space 设置校验串）。
 - [ ] `register.ts` 不再吞掉 CF Pages 域名注册失败；失败时回滚 KV 或返回可诊断错误。
 - [ ] 多租户运维文档（域名、KV、密钥）。
 

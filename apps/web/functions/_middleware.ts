@@ -7,6 +7,8 @@
  * 3. HTML requests → resolve tenant from KV, inject window.__TENANT__
  */
 
+import { escapeForScript } from '../src/lib/sanitize'
+
 interface Env {
   TENANTS_KV: KVNamespace
   /**
@@ -106,7 +108,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   let html = await response.text()
-  const script = `<script>window.__TENANT__=${JSON.stringify(toPublicTenant(tenantConfig))}<\/script>`
+  const script = `<script>window.__TENANT__=${escapeForScript(JSON.stringify(toPublicTenant(tenantConfig)))}<\/script>`
   html = html.replace('</head>', `${script}</head>`)
 
   return new Response(html, {
