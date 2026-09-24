@@ -1,7 +1,8 @@
-import { COS72_API_BASE, COS72_AUTHORIZE_URL, SSO_CALLBACK_PATH } from '../config'
+import { COS72_API_BASE, COS72_AUTHORIZE_URL, KMS_ENDPOINT, SSO_CALLBACK_PATH } from '../config'
 import { AppError } from '../lib/errors'
 import type { AirAccountAdapter } from './airAccountProvider'
 import {
+  createHttpKmsSigner,
   createPlaceholderKmsSigner,
   type KmsSigner,
   type TypedDataPayload
@@ -193,7 +194,10 @@ export function createAirAccountBridge(options: AirAccountBridgeOptions = {}): A
   const apiBase = (options.apiBase ?? COS72_API_BASE).replace(/\/+$/, '')
   const authorizeUrl = options.authorizeUrl ?? COS72_AUTHORIZE_URL
   const callbackPath = options.callbackPath ?? SSO_CALLBACK_PATH
-  const kms = options.kms ?? createPlaceholderKmsSigner()
+  // E-5: the real HTTP signer ships as soon as a KMS endpoint is configured.
+  const kms =
+    options.kms ??
+    (KMS_ENDPOINT ? createHttpKmsSigner({ endpoint: KMS_ENDPOINT }) : createPlaceholderKmsSigner())
   const fetchImpl = options.fetchImpl ?? ((...args: Parameters<typeof fetch>) => fetch(...args))
   const now = options.now ?? (() => Date.now())
 

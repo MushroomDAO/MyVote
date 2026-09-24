@@ -49,6 +49,13 @@ export const COS72_API_ORIGIN = stripTrailingSlash(getEnv('VITE_COS72_API') ?? '
 export const COS72_API_BASE = COS72_API_ORIGIN ? `${COS72_API_ORIGIN}/api/v1` : ''
 
 /**
+ * aastar TEE KMS base URL (AirAccount remote signing, E-5). Empty when unset —
+ * the bridge then keeps the placeholder signer, so nothing changes until it is
+ * configured.
+ */
+export const KMS_ENDPOINT = stripTrailingSlash(getEnv('VITE_KMS_ENDPOINT') ?? '')
+
+/**
  * The single, fixed path cos72 is allowed to redirect back to.
  *
  * Standard OAuth practice: one exact callback path, never the page the user
