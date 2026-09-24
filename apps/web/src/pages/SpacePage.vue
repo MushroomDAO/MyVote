@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
@@ -62,14 +62,15 @@ async function loadSpace(skip: number) {
   }
   error.value = null
   const token = guard.next()
+  const signal = guard.signal
   const sx = protocolForSpaceId(spaceId.value) === 'snapshot-x'
   isSx.value = sx
   try {
     if (sx) {
       // On-chain space: read from the SX indexer instead of the off-chain Hub.
       const [sxSpace, page] = await Promise.all([
-        fetchSxSpace(SX_API_ENDPOINT, spaceId.value),
-        fetchSxProposals(SX_API_ENDPOINT, spaceId.value, { first: PAGE_SIZE, skip })
+        fetchSxSpace(SX_API_ENDPOINT, spaceId.value, { signal }),
+        fetchSxProposals(SX_API_ENDPOINT, spaceId.value, { first: PAGE_SIZE, skip, signal })
       ])
       if (!guard.isCurrent(token)) return
 
@@ -88,7 +89,8 @@ async function loadSpace(skip: number) {
     const data = await fetchSpaceWithProposals(GRAPHQL_ENDPOINT, {
       spaceId: spaceId.value,
       first: PAGE_SIZE,
-      skip
+      skip,
+      signal
     })
     if (!guard.isCurrent(token)) return
 
@@ -135,6 +137,10 @@ watch(spaceId, () => {
 
 onMounted(() => {
   void loadSpace(0)
+})
+
+onUnmounted(() => {
+  guard.abort()
 })
 </script>
 
