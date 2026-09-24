@@ -7,28 +7,38 @@ import { errorKey } from './lib/errors'
 import { resolvedBranding as branding, tenant } from './tenant'
 
 const { t, locale } = useI18n()
-const auth = useAuth()
 
-// MV-4: in SSO-only mode — or once a cos72 session exists — the wallet provider
-// is not an option, and AirAccount is the only entry in the dropdown.
-const walletDisabled = auth.walletDisabled
+// Destructure to top-level bindings: <script setup> only auto-unwraps refs that
+// are top-level, so `auth.error` / `auth.isConnected` in the template would be
+// Ref objects (always truthy) rather than their values.
+const {
+  activeProviderId,
+  isConnected,
+  error,
+  errorCode,
+  user,
+  // MV-4: in SSO-only mode — or once a cos72 session exists — the wallet
+  // provider is not an option, and AirAccount is the only dropdown entry.
+  walletDisabled,
+  setProvider,
+  connect,
+  disconnect,
+  restoreSession
+} = useAuth()
 
 const emailInput = ref('')
 // Email sign-in is the interim M4 substitute and needs the address typed in.
-const needsEmail = computed(
-  () => auth.activeProviderId.value === 'email' && !auth.isConnected.value
-)
+const needsEmail = computed(() => activeProviderId.value === 'email' && !isConnected.value)
 
 /** Localized message when the failure carries a code; raw text otherwise. */
 const errorText = computed(() => {
-  const code = auth.errorCode.value
-  const key = code ? errorKey(code) : undefined
-  return key ? t(key) : (auth.error.value ?? '')
+  const key = errorCode.value ? errorKey(errorCode.value) : undefined
+  return key ? t(key) : (error.value ?? '')
 })
 
 onMounted(() => {
   // Consumes a `?code=` from cos72, or revalidates a stored token. Silent by design.
-  void auth.restoreSession()
+  void restoreSession()
 })
 
 const selectedLocale = computed({
@@ -37,24 +47,24 @@ const selectedLocale = computed({
 })
 
 const selectedProvider = computed({
-  get: () => auth.activeProviderId.value,
+  get: () => activeProviderId.value,
   set: (value) => {
-    void auth.setProvider(value)
+    void setProvider(value)
   }
 })
 
 const accountLabel = computed(() => {
-  const address = auth.user.value?.address
+  const address = user.value?.address
   if (address) return `${address.slice(0, 6)}…${address.slice(-4)}`
-  return auth.user.value?.displayName ?? ''
+  return user.value?.displayName ?? ''
 })
 
 async function onConnectClick() {
-  if (auth.isConnected.value) {
-    await auth.disconnect()
+  if (isConnected.value) {
+    await disconnect()
     return
   }
-  await auth.connect(needsEmail.value ? { email: emailInput.value } : undefined)
+  await connect(needsEmail.value ? { email: emailInput.value } : undefined)
 }
 </script>
 
@@ -96,14 +106,14 @@ async function onConnectClick() {
         />
 
         <button class="button" type="button" @click="onConnectClick">
-          {{ auth.isConnected ? t('logout') : t('login') }}
+          {{ isConnected ? t('logout') : t('login') }}
         </button>
 
-        <div v-if="auth.isConnected" class="address">{{ accountLabel }}</div>
+        <div v-if="isConnected" class="address">{{ accountLabel }}</div>
       </div>
     </header>
 
-    <div v-if="auth.error" class="error">
+    <div v-if="error" class="error">
       {{ errorText }}
     </div>
 
