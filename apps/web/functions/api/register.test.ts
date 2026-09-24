@@ -394,6 +394,22 @@ describe('POST /api/register name claim (Durable Object)', () => {
     expect(second.status).toBe(200)
   })
 
+  it('refuses a name that already has a tenant record, even with the object bound', async () => {
+    const kv = new FakeKV()
+    const registry = new FakeRegistry()
+    // A tenant published before the Durable Object rollout has no claim in the
+    // object, so the KV record is the only thing keeping the name taken.
+    await kv.put(DOMAIN, JSON.stringify({ spaceId: 'ens.eth', name: 'breadshop' }))
+
+    const res = await onRequestPost(
+      makeContext(validBody, envWith(kv, { TENANT_REGISTRY: registry.namespace }))
+    )
+
+    expect(res.status).toBe(409)
+    expect(registry.tokenFor(DOMAIN)).toBeUndefined()
+    expect(JSON.parse(kv.raw(DOMAIN) ?? '{}').spaceId).toBe('ens.eth')
+  })
+
   it('keeps the fallback behaviour when the binding is absent', async () => {
     const kv = new FakeKV()
     const first = await onRequestPost(makeContext(validBody, envWith(kv)))
