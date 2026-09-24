@@ -7,6 +7,7 @@ export default defineConfig({
   test: {
     // The AirAccount bridge needs localStorage / sessionStorage / location / history.
     environment: 'happy-dom',
-    include: ['src/**/*.test.ts'],
+    // Include the edge Functions too — they are plain TS and run under Node.
+    include: ['src/**/*.test.ts', 'functions/**/*.test.ts'],
   },
 })

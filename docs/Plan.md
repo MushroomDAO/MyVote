@@ -91,7 +91,9 @@
 - [x] **预览/生产 KV 隔离**：新增 `wrangler.preview.toml` + `scripts/deploy-preview.sh`，
       修复 `wrangler pages deploy` 把预览绑定覆盖成生产命名空间的问题（见 `docs/deployment.md` §2）。
 - [x] **多租户运维文档**：`docs/deployment.md`（环境、KV、密钥、部署命令、健康检查、排障）。
-- [ ] `register.ts` 不再吞掉 CF Pages 域名注册失败；失败时回滚 KV 或返回可诊断错误。
+- [x] **注册失败处理**：CF Pages 域名注册失败时**回滚 KV 并返回 502**（不再静默成功）；
+      未配置 CF 密钥（预览）记 `domainStatus: 'unmanaged'`，成功记 `'active'`，`/api/status` 暴露该状态。
+      本批首次为 `functions/` 建立单测（`functions/api/register.test.ts`，Node 环境）。
 
 ---
 
