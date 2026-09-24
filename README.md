@@ -33,7 +33,7 @@ A white-label governance portal for any community. **Classic Snapshot (off-chain
 | M2 Multi-tenant (KV + edge injection + self-service registration) | ✅ |
 | M3 Multi-backend write path, race guard, cache scoping, error i18n | ✅ |
 | M4 AirAccount login | ⏸ blocked on E-5 KMS + cos72 (interim email login shipped) |
-| M5 Snapshot X (EVM/OP): backend, read path, pages, results | ✅ (live vote pending a space with voting power) |
+| M5 Snapshot X (EVM/OP): backend, read path, pages, results | ✅ (real Sepolia testnet vote cast 2026-09-24; public Mana has no Sepolia gas) |
 | M5.5 Sepolia testnet community E2E: ENSv2 name → space → proposal → real votes | ✅ |
 | M6 Registration hardening + space ownership + ops runbook | ✅ (captcha/identity pending an email service) |
 
@@ -123,6 +123,7 @@ Handy entry points:
 - [`docs/snapshot-version-decision.md`](./docs/snapshot-version-decision.md) — classic vs new stack
 - [`docs/snapshot-x-integration.md`](./docs/snapshot-x-integration.md) — Snapshot X (on-chain) integration guide
 - [`docs/testnet-space-e2e.md`](./docs/testnet-space-e2e.md) — Sepolia testnet space end-to-end (ENSv2 quirks, reproducible steps)
+- [`docs/sx-testnet.md`](./docs/sx-testnet.md) — Snapshot X testnet map + verified Sepolia on-chain vote
 - [`docs/deployment.md`](./docs/deployment.md) — environments, KV namespaces, secrets, runbook
 - [`docs/M1-clone-deploy.md`](./docs/M1-clone-deploy.md) — clone & deploy for a new community
 - [`docs/M2-multi-tenant.md`](./docs/M2-multi-tenant.md) — multi-tenancy

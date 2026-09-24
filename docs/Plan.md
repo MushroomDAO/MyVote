@@ -36,6 +36,7 @@
 | **M2** Multi-Tenant | 边缘 `_middleware.ts` 从 **KV** 解析 hostname → 注入 `window.__TENANT__`；`/api/graphql` 代理（国内连通） | ✅ 完成 |
 | **M2.5** 自助注册 | `api/register.ts` 自助子域名注册 + 名称可用性检查；CF 代理 + 内存缓存 + 刷新 | ✅ 完成（**待安全加固**，见 M6） |
 | **Testnet 社区 E2E** | Sepolia 链下全流程：ENSv2 注册 → 建 space → 建提案 → Jason/Anni 真实投票 | ✅ 完成（[`docs/testnet-space-e2e.md`](./testnet-space-e2e.md)） |
+| **SX 链上投票 E2E** | Sepolia 自建 SX space → 提案 → Jason/Anni 各一票真实上链 | ✅ 完成（[`docs/sx-testnet.md`](./sx-testnet.md)） |
 | **AirAccount** | cos72 SSO 会话 + 远程 KMS 签名适配层 | 🟡 管道已通，**KMS 后端（E-5）未交付** |
 
 当前数据层默认指向 **testnet hub**（`https://testnet.hub.snapshot.org`），因为目标是 Sepolia 空间。
@@ -104,11 +105,20 @@
       投票经 `createSxBackendFromEip1193` → Mana；链下路径完全不变
 - [x] **代码分割验证**：`@snapshot-labs/sx` 现在是独立 lazy chunk（~851 KB + shutter wasm），
       仅在实际投 SX 票时加载；主 chunk 仅 +~9 KB
-- [ ] 在真实 SX space 上完成一次真实投票（需要该 space 的投票权 + 钱包；Ryu0x167 可作为目标）
+- [x] **在真实 SX space 上完成一次真实投票** —— 2026-09-24 在 **Sepolia 测试网自建 space** 上完成：
+      space `0xab081eDC235ED3A2863B1dAd7410Aa6FAE80C1ab`（`_indexer: sep`）、提案 `/1`、
+      Jason（choice 1，tx `0x6273a416…`）与 Anni（choice 2，tx `0x542fc1af…`）各一票，
+      计票 `vote_count 2` / `scores_total 2`。签名走 MyVote 同款 `EvmEthereumSig.vote()`，
+      证明手写/封装的 EIP-712 信封被真实 SX 合约接受。
+      _做法与踩坑见 [`docs/sx-testnet.md`](./sx-testnet.md)：官方 SX 测试网索引器是
+      `testnet-api.snapshot.box`；`sep` 上已有 space 的提案全 closed，必须自建；
+      提案 id 从 1 起；时长单位是区块。_
+      _阻塞：**公开 Mana 在 Sepolia 的中继钱包没 gas**（`insufficient funds`），
+      所以测试网走不通 gasless；本次是签完自己提交。主网链路不受影响。_
       _2026-09 复核：修复了 `castVote` **只签名不提交**的缺陷（#52）——sx.js `vote()`
       只产出签名信封，需再调 `send()` 才发给 Mana；中继无结果时报错。并加 opt-in 的
       中继连通性检查（`SX_LIVE=1 vitest run src/lib/sx/backend.test.ts`，验 `eth_rpc/10`
-      的 JSON-RPC 端点契约，不需要投票权）。真实投票本身仍待有投票权的钱包。
+      的 JSON-RPC 端点契约，不需要投票权）。
       _另：SX 提案页会按索引器识别当前账户是否已投票——命中则禁用提交并给出
       交易链接（#57）；该查询格式（`proposal` 用数字 id、`voter` 用校验和地址）
       由 opt-in live 用例固定（`SX_LIVE=1 vitest run src/lib/sx/api.test.ts`）。_
@@ -213,7 +223,8 @@
 
 - 选型决策：[`docs/snapshot-version-decision.md`](./snapshot-version-decision.md)
 - 历史调研（含过时结论）：[`docs/SnapshotX.md`](./SnapshotX.md)
-- 测试网 Space 全流程：[`docs/testnet-space-e2e.md`](./testnet-space-e2e.md)
+- 测试网 Space 全流程（链下）：[`docs/testnet-space-e2e.md`](./testnet-space-e2e.md)
+- SX 测试网实测（链上）：[`docs/sx-testnet.md`](./sx-testnet.md)
 - 多租户实现：[`docs/M2-multi-tenant.md`](./M2-multi-tenant.md)
 - 仓库架构评审：[`docs/architecture-review.md`](./architecture-review.md)
 - 开发循环与 pre-PR：[`docs/development-loop.md`](./development-loop.md)
