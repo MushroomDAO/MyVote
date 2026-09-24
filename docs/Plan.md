@@ -59,7 +59,15 @@
 
 **目标**：Web2 登录 + 免助记词投票真正可用。
 
-- [ ] **E-5**：KMS HTTP 签名端点（`signTypedData` / `signMessage`）落地，替换 `createPlaceholderKmsSigner()`。
+- [x] **E-5（MyVote 侧）**：`createHttpKmsSigner` 落地 `/kms/SignTypedData`（KMS 的
+      数组形式 payload、`x-amz-target`、agent JWT / `x-api-key`），配置 `VITE_KMS_ENDPOINT`
+      即可替换 placeholder。
+      _2026-09 真机核对（`https://kms.aastar.io` v0.29.0，`KMS_E2E_API_KEY` 有效）：`x-api-key`
+      能过端点门，但 `/kms/SignTypedData` 仍要求 **agent JWT 或 challenge-bound WebAuthn**；
+      `/kms/create-agent-key` 同为 WebAuthn 门控。故真机签名待 cos72 签发 agent JWT（或浏览器
+      passkey ceremony），SSO token 正是这个凭据。_
+- [ ] **E-5（真机签名）**：用 cos72 的 agent JWT 或浏览器 passkey，在 kms.aastar.io 上签出
+      一份 EIP-712 签名并验签。
 - [ ] **cos72**：SSO 授权落地页（`/sso/authorize` 前的第一方页面）上线；`VITE_COS72_AUTHORIZE_URL` 指向它。
 - [ ] cos72 refresh endpoint 就绪后，把 SSO token 从 `sessionStorage` 迁到内存 + HttpOnly 刷新 Cookie。
 - [ ] E2E：Web2 登录 → 投票全链路。
