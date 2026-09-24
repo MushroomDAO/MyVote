@@ -13,8 +13,14 @@ import { AppError, resolveErrorMessage, type ErrorCode } from '../lib/errors'
 import { fetchProposal, type Proposal, type ProposalType } from '../lib/graphql'
 import { createRequestGuard } from '../lib/requestGuard'
 import { type VoteChoice } from '../lib/snapshotVote'
-import { createEthersCompatSigner } from '../lib/sx/backend'
-import { buildSxVoteRequest, fetchSxProposal, type SxProposal } from '../lib/sx/api'
+import { createEthersCompatSigner, sxTxUrl } from '../lib/sx/backend'
+import {
+  buildSxVoteRequest,
+  fetchSxProposal,
+  fetchSxVoterVote,
+  type SxProposal,
+  type SxVote
+} from '../lib/sx/api'
 import { sxVoteBlock, type SxVoteBlock } from '../lib/sx/eligibility'
 import { createSxBackendFromEip1193, type Eip1193Provider } from '../lib/sx/provider'
 import { activeVoteBackend } from '../lib/voteBackend'
@@ -26,6 +32,8 @@ const auth = useAuth()
 
 const proposalId = computed(() => String(route.params.id ?? ''))
 const guard = createRequestGuard()
+/** Its own guard: the voter lookup must not invalidate the proposal load. */
+const voteGuard = createRequestGuard()
 
 /**
  * SX proposals are only unique within their space, so the space rides in the
@@ -36,6 +44,10 @@ const sxSpaceId = computed(() => {
   return typeof value === 'string' && protocolForSpaceId(value) === 'snapshot-x' ? value : null
 })
 const isSx = computed(() => sxSpaceId.value !== null)
+/** The connected account's indexed vote, when it already voted on this proposal. */
+const existingSxVote = ref<SxVote | null>(null)
+/** Set right after this session's on-chain vote, before the indexer catches up. */
+const sxVoted = ref(false)
 /** SX proposals keep their indexed state; use it to disable an impossible vote. */
 const sxClosed = computed(() => sxProposal.value?.state.toLowerCase() === 'closed')
 
@@ -53,8 +65,15 @@ const SX_BLOCK_CODES: Record<SxVoteBlock, ErrorCode> = {
 const offchainClosed = computed(() =>
   proposal.value ? ['closed', 'pending'].includes(proposal.value.state.toLowerCase()) : false
 )
+/** Explorer link for the indexed on-chain vote, when there is one. */
+const sxVoteLink = computed(() => sxTxUrl(sxProposal.value?.network, existingSxVote.value?.tx))
+
 /** Whether the current proposal can be voted on right now. */
-const canVote = computed(() => (isSx.value ? !sxClosed.value : !offchainClosed.value))
+const canVote = computed(() =>
+  isSx.value
+    ? !sxClosed.value && !sxVoted.value && !existingSxVote.value
+    : !offchainClosed.value
+)
 /** Raw indexed SX proposal — carries the authenticator/strategies a vote needs. */
 const sxProposal = ref<SxProposal | null>(null)
 
@@ -216,6 +235,30 @@ async function refreshOffchainProposal() {
   }
 }
 
+/**
+ * Looks up the connected account's vote on this SX proposal. The indexer matches
+ * the voter address byte-for-byte, and an on-chain vote cannot be repeated, so a
+ * hit disables submit. Best-effort: an unknown state keeps the button enabled.
+ */
+async function loadExistingSxVote() {
+  existingSxVote.value = null
+  const sx = sxProposal.value
+  const address = auth.user.value?.address
+  if (!sx || !address || !sxSpaceId.value) return
+  const token = voteGuard.next()
+  try {
+    const vote = await fetchSxVoterVote(
+      SX_API_ENDPOINT,
+      { spaceId: sxSpaceId.value, proposalId: sx.proposalId, voter: address },
+      { signal: voteGuard.signal }
+    )
+    if (!voteGuard.isCurrent(token)) return
+    existingSxVote.value = vote
+  } catch {
+    // Keep the button enabled; the on-chain authenticator is the real gate.
+  }
+}
+
 async function loadProposal() {
   if (!proposalId.value) return
   loading.value = true
@@ -224,12 +267,14 @@ async function loadProposal() {
   voteReceipt.value = null
   selectedChoice.value = null
   reason.value = ''
+  sxVoted.value = false
   const token = guard.next()
   try {
     const { sx, proposal: next } = await fetchProposalData(guard.signal)
     if (!guard.isCurrent(token)) return
     sxProposal.value = sx
     proposal.value = next
+    if (sx) void loadExistingSxVote()
   } catch (e) {
     if (!guard.isCurrent(token)) return
     error.value = e instanceof Error ? e.message : String(e)
@@ -292,9 +337,13 @@ async function submitVote() {
           signTypedData: (typedData) => auth.provider.value.signTypedData({ address, typedData })
         })
 
-    // Off-chain tallies update immediately; pull them in behind the receipt.
-    // (refreshOffchainProposal decides whether that applies to this space.)
-    void refreshOffchainProposal()
+    if (isSx.value) {
+      // An on-chain vote cannot be repeated; keep the button disabled meanwhile.
+      sxVoted.value = true
+    } else {
+      // Off-chain tallies update immediately; pull them in behind the receipt.
+      void refreshOffchainProposal()
+    }
   } catch (e) {
     if (e instanceof KmsNotConfiguredError) {
       // Expected until E-5 lands: AirAccount signing has no backend yet.
@@ -322,6 +371,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   guard.abort()
+  voteGuard.abort()
 })
 </script>
 
@@ -434,6 +484,13 @@ onUnmounted(() => {
         >
           {{ submittingVote ? t('loading') : t('submitVote') }}
         </button>
+
+        <div v-if="isSx && (sxVoted || existingSxVote)" class="sxVoteNote">
+          {{ t('sxAlreadyVoted') }}
+          <a v-if="sxVoteLink" class="sxVoteLink" :href="sxVoteLink" target="_blank" rel="noopener">
+            {{ t('sxViewTx') }}
+          </a>
+        </div>
 
         <div v-if="voteError" class="voteError">{{ t('voteError') }}: {{ voteError }}</div>
         <div v-else-if="voteReceipt" class="voteOk">{{ t('voteSubmitted') }}</div>
@@ -723,6 +780,17 @@ onUnmounted(() => {
 .submit:disabled {
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+.sxVoteNote {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--mv-muted);
+}
+
+.sxVoteLink {
+  margin-left: 6px;
+  color: var(--mv-primary);
 }
 
 .voteError {

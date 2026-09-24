@@ -5,6 +5,7 @@ import {
   createSnapshotXEvmBackend,
   primaryTypeOf,
   sxNetworkLabel,
+  sxTxUrl,
   SX_MANA_URL,
   SX_WHITELIST_URL,
   type SxClient,
@@ -17,6 +18,19 @@ describe('sxNetworkLabel', () => {
     expect(sxNetworkLabel('base')).toBe('Base')
     expect(sxNetworkLabel(null)).toBeNull()
     expect(sxNetworkLabel(undefined)).toBeNull()
+  })
+})
+
+describe('sxTxUrl', () => {
+  it('links a transaction on its network explorer', () => {
+    expect(sxTxUrl('optimism', '0xabc')).toBe('https://optimistic.etherscan.io/tx/0xabc')
+    expect(sxTxUrl('base', '0xabc')).toBe('https://basescan.org/tx/0xabc')
+  })
+
+  it('returns null when the network or transaction is missing', () => {
+    expect(sxTxUrl(null, '0xabc')).toBeNull()
+    expect(sxTxUrl('optimism', null)).toBeNull()
+    expect(sxTxUrl(undefined, undefined)).toBeNull()
   })
 })
 
