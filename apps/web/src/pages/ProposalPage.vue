@@ -487,6 +487,9 @@ onUnmounted(() => {
 
         <div v-if="isSx && (sxVoted || existingSxVote)" class="sxVoteNote">
           {{ t('sxAlreadyVoted') }}
+          <span v-if="existingSxVote && existingSxVote.vp !== null" class="sxVotePower">
+            · {{ t('sxVotePower') }}: {{ existingSxVote.vp }}
+          </span>
           <a v-if="sxVoteLink" class="sxVoteLink" :href="sxVoteLink" target="_blank" rel="noopener">
             {{ t('sxViewTx') }}
           </a>

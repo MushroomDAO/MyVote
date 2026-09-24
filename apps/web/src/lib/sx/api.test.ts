@@ -352,4 +352,27 @@ describe.skipIf(!process.env.SX_LIVE)('live indexer (SX_LIVE=1)', () => {
     },
     30000
   )
+
+  it(
+    'finds an indexed vote by numeric proposal id and checksummed voter',
+    async () => {
+      // Proposal 1 of this space has votes; the address below is one of them.
+      const voted = await fetchSxVoterVote(SX_API_DEFAULT, {
+        spaceId: LIVE_SPACE,
+        proposalId: 1,
+        voter: '0x597076433419736483644cE44064E00Ac22446a9'
+      })
+      expect(voted).not.toBeNull()
+      expect(voted!.tx).toMatch(/^0x[0-9a-fA-F]{64}$/)
+
+      // A different address has no vote on the same proposal.
+      const other = await fetchSxVoterVote(SX_API_DEFAULT, {
+        spaceId: LIVE_SPACE,
+        proposalId: 1,
+        voter: '0x1111111111111111111111111111111111111111'
+      })
+      expect(other).toBeNull()
+    },
+    30000
+  )
 })

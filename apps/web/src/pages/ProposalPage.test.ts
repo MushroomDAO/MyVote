@@ -89,7 +89,8 @@ const i18n = createI18n({
       retry: 'Retry',
       voteSubmitted: 'VOTE_SUBMITTED',
       sxAlreadyVoted: 'SX_ALREADY_VOTED',
-      sxViewTx: 'VIEW_TX'
+      sxViewTx: 'VIEW_TX',
+      sxVotePower: 'VP'
     }
   }
 })
@@ -271,7 +272,7 @@ describe('ProposalPage existing on-chain vote', () => {
     fetchSxVoterVote.mockResolvedValue({
       id: SX_SPACE + '/12/0x1111111111111111111111111111111111111111',
       choice: 1,
-      vp: 1,
+      vp: 2.5,
       tx: '0xdeadbeef'
     })
 
@@ -289,6 +290,8 @@ describe('ProposalPage existing on-chain vote', () => {
     expect(wrapper.get('.sxVoteLink').attributes('href')).toBe(
       'https://optimistic.etherscan.io/tx/0xdeadbeef'
     )
+    // The indexed voting power is surfaced with the note.
+    expect(wrapper.get('.sxVotePower').text()).toContain('2.5')
   })
 
   it('keeps submit enabled when the lookup finds nothing', async () => {
