@@ -14,7 +14,13 @@ vi.mock('vue', async (importOriginal) => {
 })
 vi.mock('./App.vue', () => ({ default: { name: 'AppStub' } }))
 vi.mock('./router', () => ({ router: { __router: true } }))
-vi.mock('./i18n', () => ({ i18n: { __i18n: true } }))
+vi.mock('./i18n', () => ({
+  i18n: { __i18n: true },
+  getInitialLocale: () => 'en',
+  applyDocumentLocale: (locale: string) => {
+    document.documentElement.lang = locale
+  }
+}))
 vi.mock('./tenant', () => ({
   resolvedBranding: {
     name: 'TestBrand',
@@ -37,6 +43,7 @@ describe('main bootstrap', () => {
     expect(root.style.getPropertyValue('--mv-error')).toBe('#333333')
     expect(root.style.getPropertyValue('--mv-selected-bg')).toBe('#444444')
     expect(document.title).toBe('TestBrand')
+    expect(document.documentElement.lang).toBe('en')
 
     expect(m.app.use).toHaveBeenCalledTimes(2)
     expect(m.app.mount).toHaveBeenCalledWith('#app')

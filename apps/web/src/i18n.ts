@@ -82,6 +82,7 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     nameInvalid: '格式不正确',
     registerSuccess: '注册成功！',
     registerSuccessDesc: '你的社区治理页面已就绪：',
+    registerSuccessNote: 'DNS 生效可能需要 1–2 分钟，届时刷新即可访问。',
     registerError: '注册失败',
     refresh: '刷新',
     retry: '重试',
@@ -170,6 +171,7 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     nameInvalid: 'Invalid format',
     registerSuccess: 'Registration successful!',
     registerSuccessDesc: 'Your community governance page is live at:',
+    registerSuccessNote: 'DNS can take 1–2 minutes to propagate — refresh then.',
     registerError: 'Registration failed',
     refresh: 'Refresh',
     retry: 'Retry',
@@ -206,7 +208,13 @@ export const i18n = createI18n({
   messages
 })
 
+/** Keeps <html lang> accurate so assistive tech and hyphenation follow the UI. */
+export function applyDocumentLocale(locale: AppLocale) {
+  document.documentElement.lang = locale
+}
+
 export function setLocale(locale: AppLocale) {
   i18n.global.locale.value = locale
   localStorage.setItem(LOCALE_STORAGE_KEY, locale)
+  applyDocumentLocale(locale)
 }

@@ -53,6 +53,7 @@ const i18n = createI18n({
       registerError: 'REGISTER_ERROR',
       registerSuccess: 'REGISTER_SUCCESS',
       registerSuccessDesc: 'it worked',
+      registerSuccessNote: 'DNS_NOTE',
       loading: 'LOADING'
     }
   }
@@ -191,6 +192,7 @@ describe('RegisterPage submission', () => {
       email: 'alice@example.com'
     })
     expect(wrapper.text()).toContain('REGISTER_SUCCESS')
+    expect(wrapper.text()).toContain('DNS_NOTE')
     expect(wrapper.get('.successLink').attributes('href')).toBe('https://bread.example.com')
     // The form is replaced by the success card.
     expect(wrapper.find('.submitBtn').exists()).toBe(false)

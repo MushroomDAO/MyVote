@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import './style.css'
 import App from './App.vue'
-import { i18n } from './i18n'
+import { applyDocumentLocale, getInitialLocale, i18n } from './i18n'
 import { router } from './router'
 import { resolvedBranding } from './tenant'
 
@@ -14,5 +14,8 @@ root.style.setProperty('--mv-selected-bg', resolvedBranding.colors.selectedBg)
 
 // Set document title from resolved branding
 document.title = resolvedBranding.name
+
+// Align <html lang> with the startup locale, rather than index.html's fixed value.
+applyDocumentLocale(getInitialLocale())
 
 createApp(App).use(router).use(i18n).mount('#app')
