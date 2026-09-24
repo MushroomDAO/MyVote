@@ -316,7 +316,12 @@ onUnmounted(() => {
     </div>
 
     <div v-else-if="error" class="card">
-      <div class="error">{{ error }}</div>
+      <div class="error">
+        {{ error }}
+        <button class="retryBtn" type="button" :disabled="loading" @click="loadProposal()">
+          {{ t('retry') }}
+        </button>
+      </div>
     </div>
 
     <div v-else-if="!proposal" class="card">
@@ -717,6 +722,20 @@ onUnmounted(() => {
 .error {
   color: var(--mv-error);
   word-break: break-word;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.retryBtn {
+  align-self: flex-start;
+  border: 1px solid var(--mv-border-md);
+  border-radius: 8px;
+  padding: 4px 12px;
+  background: var(--mv-surface);
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
 }
 
 @media (max-width: 720px) {

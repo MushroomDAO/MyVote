@@ -79,7 +79,8 @@ const i18n = createI18n({
       sxOnchain: 'ONCHAIN',
       sxUnknownNetwork: 'SX_UNKNOWN_NETWORK',
       noWallet: 'NO_WALLET',
-      noAccount: 'NO_ACCOUNT'
+      noAccount: 'NO_ACCOUNT',
+      retry: 'Retry'
     }
   }
 })
@@ -187,6 +188,26 @@ describe('ProposalPage vote errors', () => {
 
     expect(wrapper.find('.submit').attributes('disabled')).toBeDefined()
     expect(castVote).not.toHaveBeenCalled()
+  })
+})
+
+describe('ProposalPage error recovery', () => {
+  it('offers a retry that refetches the proposal', async () => {
+    resetRoute()
+    routeState.params = { id: '0xprop' }
+    fetchProposal.mockRejectedValueOnce(new Error('HUB_DOWN')).mockResolvedValueOnce({
+      proposal: proposal()
+    })
+
+    const wrapper = mount(ProposalPage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('HUB_DOWN')
+    await wrapper.get('.retryBtn').trigger('click')
+    await flushPromises()
+
+    expect(fetchProposal).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('Test')
   })
 })
 

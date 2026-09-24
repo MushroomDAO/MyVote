@@ -31,6 +31,8 @@ const sxError = ref<string | null>(null)
 // Recently created on-chain spaces — the Hub listing only has ENS spaces.
 const sxSpaces = ref<SxSpace[]>([])
 const sxLoading = ref(false)
+/** True when the last on-chain list read failed (it is best-effort). */
+const sxFailed = ref(false)
 
 const spaces = ref<Space[]>([])
 const loading = ref(false)
@@ -93,11 +95,15 @@ function refresh() {
 /** Best-effort: a failure here must not take down the off-chain Explore list. */
 async function loadSxSpaces() {
   sxLoading.value = true
+  sxFailed.value = false
   const token = sxGuard.next()
   try {
     sxSpaces.value = await fetchSxSpaces(SX_API_ENDPOINT, { first: 6, signal: sxGuard.signal })
   } catch {
-    if (sxGuard.isCurrent(token)) sxSpaces.value = []
+    if (sxGuard.isCurrent(token)) {
+      sxSpaces.value = []
+      sxFailed.value = true
+    }
   } finally {
     if (sxGuard.isCurrent(token)) sxLoading.value = false
   }
@@ -183,6 +189,10 @@ onUnmounted(() => {
         <span class="muted">{{ t('onchainSpaces') }}</span>
       </div>
       <div v-if="sxLoading" class="placeholder">{{ t('loading') }}</div>
+      <div v-else-if="sxFailed" class="error">
+        {{ t('error') }}
+        <button class="retryBtn" type="button" @click="loadSxSpaces">{{ t('retry') }}</button>
+      </div>
       <div v-else-if="sxSpaces.length === 0" class="placeholder">{{ t('empty') }}</div>
       <ul v-else class="list">
         <li v-for="sp in sxSpaces" :key="sp.id" class="item">
