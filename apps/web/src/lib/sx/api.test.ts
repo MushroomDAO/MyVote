@@ -52,6 +52,7 @@ const PROPOSAL_WIRE: SxProposalWire = {
   strategies_params: ['0x3d998d116d221187f395fc08625b1d5b3bc3ee17f45cc11d869b7165665f391a'],
   space: {
     id: '0x03C7431e14F7b759Aa44398AD7901e6053c197Bf',
+    metadata: { name: 'Ryu0x167 Space Command' },
     authenticators: ['0x5f9B7D78c9a37a439D78f801E0E339C6E711e260'],
     strategies_indices: [0],
     strategies: ['0x34f0AfFF5A739bBf3E285615F50e40ddAaf2A829'],
@@ -85,6 +86,7 @@ describe('mappers', () => {
     expect(proposal.start).toBe(1726091981)
     expect(proposal.end).toBe(1726092101)
     expect(proposal.space?.authenticators).toHaveLength(1)
+    expect(proposal.space?.name).toBe('Ryu0x167 Space Command')
     // Results render from the parsed per-choice scores.
     expect(proposal.type).toBe('basic')
     expect(proposal.scores).toEqual([3, 0, 0])
