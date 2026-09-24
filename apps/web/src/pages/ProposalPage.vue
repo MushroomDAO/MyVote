@@ -9,12 +9,13 @@ import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME, SX_API_ENDPOINT } from '../config'
 import { useAuth } from '../auth/useAuth'
 import { EmailSigningUnsupportedError } from '../auth/emailProvider'
 import { KmsNotConfiguredError } from '../auth/kms'
-import { resolveErrorMessage } from '../lib/errors'
+import { AppError, resolveErrorMessage, type ErrorCode } from '../lib/errors'
 import { fetchProposal, type Proposal, type ProposalType } from '../lib/graphql'
 import { createRequestGuard } from '../lib/requestGuard'
 import { type VoteChoice } from '../lib/snapshotVote'
 import { createEthersCompatSigner } from '../lib/sx/backend'
 import { buildSxVoteRequest, fetchSxProposal, type SxProposal } from '../lib/sx/api'
+import { sxVoteBlock, type SxVoteBlock } from '../lib/sx/eligibility'
 import { createSxBackendFromEip1193, type Eip1193Provider } from '../lib/sx/provider'
 import { activeVoteBackend } from '../lib/voteBackend'
 import { protocolForSpaceId } from '../lib/voteRouting'
@@ -35,6 +36,14 @@ const sxSpaceId = computed(() => {
   return typeof value === 'string' && protocolForSpaceId(value) === 'snapshot-x' ? value : null
 })
 const isSx = computed(() => sxSpaceId.value !== null)
+/** SX proposals keep their indexed state; use it to disable an impossible vote. */
+const sxClosed = computed(() => sxProposal.value?.state.toLowerCase() === 'closed')
+
+const SX_BLOCK_CODES: Record<SxVoteBlock, ErrorCode> = {
+  closed: 'sxVoteClosed',
+  'not-started': 'sxVoteNotStarted',
+  'no-authenticator': 'sxNoAuthenticator'
+}
 /** Raw indexed SX proposal — carries the authenticator/strategies a vote needs. */
 const sxProposal = ref<SxProposal | null>(null)
 
@@ -130,6 +139,19 @@ async function castSxVote(address: string, choice: number) {
   const sx = sxProposal.value
   if (!sx) throw new Error('SX proposal not loaded')
   if (!sx.network) throw new Error(t('sxUnknownNetwork'))
+
+  // Pre-flight: don't make the user sign (and Mana reject) a vote that cannot be
+  // accepted. Voting power itself is only knowable on-chain.
+  const block = sxVoteBlock(
+    {
+      state: sx.state,
+      start: sx.start,
+      maxEnd: sx.maxEnd,
+      hasAuthenticator: (sx.space?.authenticators.length ?? 0) > 0
+    },
+    Math.floor(Date.now() / 1000)
+  )
+  if (block) throw new AppError(SX_BLOCK_CODES[block], 'SX vote blocked: ' + block)
 
   const eip1193 = (window as unknown as { ethereum?: Eip1193Provider }).ethereum
   if (!eip1193) throw new Error(t('noWallet'))
@@ -359,7 +381,12 @@ onMounted(() => {
         <label class="reasonLabel" for="reason">{{ t('reasonOptional') }}</label>
         <textarea id="reason" v-model="reason" class="reason" rows="3" />
 
-        <button class="submit" type="button" :disabled="submittingVote" @click="submitVote">
+        <button
+          class="submit"
+          type="button"
+          :disabled="submittingVote || (isSx && sxClosed)"
+          @click="submitVote"
+        >
           {{ submittingVote ? t('loading') : t('submitVote') }}
         </button>
 

@@ -17,6 +17,9 @@ export type ErrorCode =
   | 'ssoSessionExpired'
   | 'accountMismatch'
   | 'walletSwitchBlocked'
+  | 'sxVoteClosed'
+  | 'sxVoteNotStarted'
+  | 'sxNoAuthenticator'
 
 /** i18n key for each code. Keep in sync with apps/web/src/i18n.ts. */
 const ERROR_KEYS: Record<ErrorCode, string> = {
@@ -29,7 +32,10 @@ const ERROR_KEYS: Record<ErrorCode, string> = {
   ssoNoSession: 'errSsoNoSession',
   ssoSessionExpired: 'errSsoSessionExpired',
   accountMismatch: 'errAccountMismatch',
-  walletSwitchBlocked: 'errWalletSwitchBlocked'
+  walletSwitchBlocked: 'errWalletSwitchBlocked',
+  sxVoteClosed: 'errSxVoteClosed',
+  sxVoteNotStarted: 'errSxVoteNotStarted',
+  sxNoAuthenticator: 'errSxNoAuthenticator'
 }
 
 /** i18n key for a code, if one is registered. */

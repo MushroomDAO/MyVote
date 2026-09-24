@@ -71,6 +71,7 @@ const i18n = createI18n({
       emailSigningUnsupported: 'EMAIL_CANNOT_SIGN',
       errVoteClockSkew: 'CLOCK_SKEW:{detail}',
       errVoteRejected: 'HUB_REJECTED:{status}:{detail}',
+      errSxVoteClosed: 'SX_VOTE_CLOSED',
       voteError: 'Vote failed',
       submitVote: 'Submit vote',
       voteChoice: 'Choose an option',
@@ -111,10 +112,11 @@ function sxProposal() {
     title: 'SX Title',
     body: '',
     choices: ['For', 'Against'],
-    state: 'closed',
+    state: 'active',
     snapshot: 125246602,
     start: 1700000000,
     end: 1800000000,
+    maxEnd: 1900000000,
     voteCount: 3,
     type: 'basic',
     scores: [3, 0],
@@ -214,6 +216,33 @@ describe('ProposalPage Snapshot X', () => {
     })
     // The off-chain backend must not be used for an SX space.
     expect(castVote).not.toHaveBeenCalled()
+  })
+
+  it('disables submit on a closed on-chain proposal', async () => {
+    routeState.params = { id: '12' }
+    routeState.query = { space: SX_SPACE }
+    fetchSxProposal.mockResolvedValue({ ...sxProposal(), state: 'closed' })
+
+    const wrapper = mount(ProposalPage, { global: { plugins: [i18n] } })
+    await flushPromises()
+    await wrapper.find('.choiceButton').trigger('click')
+
+    expect(wrapper.find('.submit').attributes('disabled')).toBeDefined()
+  })
+
+  it('blocks an out-of-window on-chain vote before signing, with a translated reason', async () => {
+    routeState.params = { id: '12' }
+    routeState.query = { space: SX_SPACE }
+    authState.providerId = 'wallet'
+    authState.user = { address: '0x1111111111111111111111111111111111111111' }
+    // Indexed state still says active, but the voting window has passed.
+    fetchSxProposal.mockResolvedValue({ ...sxProposal(), state: 'active', maxEnd: 1700000001 })
+    ;(window as unknown as { ethereum?: unknown }).ethereum = { request: vi.fn() }
+
+    const wrapper = await mountAndVote()
+
+    expect(wrapper.text()).toContain('SX_VOTE_CLOSED')
+    expect(sxCastVote).not.toHaveBeenCalled()
   })
 
   it('reports a missing wallet instead of attempting an on-chain vote', async () => {
