@@ -300,3 +300,108 @@ describe('POST /api/register email verification (M6-3)', () => {
   })
 })
 
+/**
+ * In-memory stand-in for the TenantRegistry Durable Object. Calls queue on a
+ * promise chain, which mirrors the real object's single-threaded handling.
+ */
+class FakeRegistry {
+  readonly held = new Map<string, string>()
+  private tail: Promise<unknown> = Promise.resolve()
+
+  private async handle(request: Request): Promise<Response> {
+    const url = new URL(request.url)
+    const body = (await request.json()) as { domain: string; token: string }
+    if (url.pathname === '/claim') {
+      if (this.held.has(body.domain)) return Response.json({ ok: false, taken: true })
+      this.held.set(body.domain, body.token)
+      return Response.json({ ok: true })
+    }
+    if (this.held.get(body.domain) === body.token) this.held.delete(body.domain)
+    return Response.json({ ok: true })
+  }
+
+  readonly namespace = {
+    idFromName: (name: string) => name,
+    get: () => ({
+      fetch: (request: Request) => {
+        const run = this.tail.then(() => this.handle(request))
+        this.tail = run.then(
+          () => undefined,
+          () => undefined
+        )
+        return run
+      }
+    })
+  }
+
+  tokenFor(domain: string): string | undefined {
+    return this.held.get(domain)
+  }
+}
+
+describe('POST /api/register name claim (Durable Object)', () => {
+  it('lets exactly one of two concurrent registrations for a name win', async () => {
+    const kv = new FakeKV()
+    const registry = new FakeRegistry()
+    const env = envWith(kv, { TENANT_REGISTRY: registry.namespace })
+
+    const responses = await Promise.all([
+      onRequestPost(makeContext(validBody, env)),
+      onRequestPost(makeContext(validBody, env))
+    ])
+
+    const statuses = responses.map((res) => res.status).sort()
+    expect(statuses).toEqual([200, 409])
+    expect(registry.tokenFor(DOMAIN)).toBeDefined()
+  })
+
+  it('rejects a second registration for a name already held', async () => {
+    const kv = new FakeKV()
+    const registry = new FakeRegistry()
+    const env = envWith(kv, { TENANT_REGISTRY: registry.namespace })
+
+    await registry.namespace.get().fetch(
+      new Request('https://tenant-registry/claim', {
+        method: 'POST',
+        body: JSON.stringify({ domain: DOMAIN, token: 'someone-else' })
+      })
+    )
+
+    const res = await onRequestPost(makeContext(validBody, env))
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ error: 'This name is already taken' })
+    // The losing request must not publish a tenant record.
+    expect(kv.has(DOMAIN)).toBe(false)
+  })
+
+  it('releases the claim when Cloudflare domain registration fails', async () => {
+    const kv = new FakeKV()
+    const registry = new FakeRegistry()
+    const env = envWith(kv, { ...CF_ENV, TENANT_REGISTRY: registry.namespace })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(cfResponse({ success: false, errors: [{ message: 'boom' }] }))
+    )
+
+    const first = await onRequestPost(makeContext(validBody, env))
+    expect(first.status).toBe(502)
+    expect(kv.has(DOMAIN)).toBe(false)
+    // A failed attempt frees the name: the next registration can claim it again.
+    expect(registry.tokenFor(DOMAIN)).toBeUndefined()
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(cfResponse({ success: true })))
+    const second = await onRequestPost(makeContext(validBody, env))
+    expect(second.status).toBe(200)
+  })
+
+  it('keeps the fallback behaviour when the binding is absent', async () => {
+    const kv = new FakeKV()
+    const first = await onRequestPost(makeContext(validBody, envWith(kv)))
+    const second = await onRequestPost(makeContext(validBody, envWith(kv)))
+
+    expect(first.status).toBe(200)
+    expect(second.status).toBe(409)
+  })
+})
+
+

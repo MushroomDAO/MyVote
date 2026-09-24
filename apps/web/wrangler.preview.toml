@@ -14,6 +14,13 @@ pages_build_output_dir = "dist"
 binding = "TENANTS_KV"
 id = "34c1c5f2e50243d1992af2f547151140"
 
+# Registration uniqueness lock, bound to a PREVIEW Worker namespace so probe
+# names claimed while testing never block a real registration on production.
+[[durable_objects.bindings]]
+name = "TENANT_REGISTRY"
+class_name = "TenantRegistry"
+script_name = "myvote-tenant-registry-preview"
+
 [vars]
 CF_ROOT_DOMAIN = "forest.mushroom.cv"
 SNAPSHOT_HUB = "https://testnet.hub.snapshot.org"

@@ -14,6 +14,8 @@
 
 interface Env {
   TENANTS_KV: KVNamespace
+  /** Durable Object that serialises name claims; see docs/registration-atomicity.md. */
+  TENANT_REGISTRY?: TenantRegistryNamespace
   CF_ACCOUNT_ID: string
   CF_API_TOKEN: string
   CF_ZONE_ID: string
@@ -60,6 +62,12 @@ import {
   type OwnershipVerdict
 } from '../../src/lib/ownership'
 import { hitRateLimit } from '../../src/lib/rateLimit'
+import {
+  claimDomain,
+  releaseDomain,
+  reserveByKv,
+  type TenantRegistryNamespace
+} from '../../src/lib/tenantRegistry'
 import { isValidSpaceId, isValidSubdomain } from '../../src/lib/registration'
 
 /** Registration attempts allowed per IP per hour. */
@@ -143,6 +151,30 @@ async function cfApi(token: string, path: string, method: string, body?: unknown
     ...(body ? { body: JSON.stringify(body) } : {}),
   })
   return res.json() as Promise<{ success: boolean; errors?: { message: string }[]; result?: unknown }>
+}
+
+/**
+ * Claims `domain` for `token`.
+ *
+ * With `TENANT_REGISTRY` bound this is one atomic operation in the Durable
+ * Object; without it the KV fallback can race, so the binding is what closes
+ * the hole (see docs/registration-atomicity.md).
+ */
+async function claimName(env: Env, domain: string, token: string): Promise<boolean> {
+  const registry = env.TENANT_REGISTRY
+  if (registry) return claimDomain(registry, domain, token)
+
+  // KV has no compare-and-set: check first so an existing tenant record is not
+  // overwritten by a losing reservation.
+  const existing = await env.TENANTS_KV.get(domain)
+  if (existing !== null) return false
+  return reserveByKv(env.TENANTS_KV, domain, token)
+}
+
+/** Gives the name back after a registration that did not complete. */
+async function releaseName(env: Env, domain: string, token: string): Promise<void> {
+  if (!env.TENANT_REGISTRY) return
+  await releaseDomain(env.TENANT_REGISTRY, domain, token)
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -244,22 +276,18 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     )
   }
 
-  // --- Uniqueness check ---
-  const existing = await context.env.TENANTS_KV.get(domain)
-  if (existing !== null) {
+  // --- Claim the name ---
+  // With the Durable Object bound this is a single atomic operation; without it
+  // we fall back to the KV reserve-and-read-back dance, which narrows the race
+  // without closing it (see docs/registration-atomicity.md).
+  const reservation = crypto.randomUUID()
+  if (!(await claimName(context.env, domain, reservation))) {
     return Response.json({ error: 'This name is already taken', domain }, { status: 409 })
   }
 
   const token = context.env.CF_API_TOKEN
   const accountId = context.env.CF_ACCOUNT_ID
   const pagesProject = context.env.CF_PAGES_PROJECT
-
-  // --- Write to KV (reserve, then confirm) ---
-  // KV has no compare-and-set, so two concurrent requests can both pass the
-  // uniqueness check above. Write a random token and read it back: the last
-  // writer wins, so the loser sees a foreign token and backs off. This narrows,
-  // but cannot fully close, the race — a hard guarantee needs Durable Objects.
-  const reservation = crypto.randomUUID()
   const tenantConfig = {
     spaceId,
     name,
@@ -274,11 +302,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     createdAt: new Date().toISOString(),
     _reservation: reservation,
   }
-  await context.env.TENANTS_KV.put(domain, JSON.stringify(tenantConfig))
-
-  const stored = await context.env.TENANTS_KV.get<{ _reservation?: string }>(domain, 'json')
-  if (stored?._reservation !== reservation) {
-    return Response.json({ error: 'This name is already taken', domain }, { status: 409 })
+  try {
+    await context.env.TENANTS_KV.put(domain, JSON.stringify(tenantConfig))
+  } catch (error) {
+    // Publishing the record failed: give the name back before surfacing it.
+    await releaseName(context.env, domain, reservation)
+    throw error
   }
 
   // --- Register the custom domain on the Pages project (issues the SSL cert) ---
@@ -299,8 +328,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   if (outcome.kind === 'rollback') {
     // A KV entry whose domain never got registered looks "taken" but serves
-    // nothing. Undo the write and fail loudly so the user can retry the name.
+    // nothing. Undo the write, release the claim and fail loudly so the user can
+    // retry the name.
     await context.env.TENANTS_KV.delete(domain)
+    await releaseName(context.env, domain, reservation)
     return Response.json(
       {
         error: 'Custom domain registration failed, please try again',
