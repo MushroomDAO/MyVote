@@ -73,6 +73,28 @@ KV 中只存加盐 SHA-256（`ec:<email>`），明文只出现在邮件里。发
 **preview**：只有非敏感的 `CF_ROOT_DOMAIN`、`SNAPSHOT_HUB`。
 > 预览环境**刻意不配置 CF 密钥**：这样预览里的注册请求不会真的去开通 Pages 自定义域名。
 > 预览同样不配 `RESEND_API_KEY`，因此 `/api/email-code` 返回 503，注册流程保持开放。
+**本地验证邮箱验证码（M6-3）**：
+
+用 `wrangler pages dev -b` 注入密钥，不落盘（因此也不会有被误提交的 `.dev.vars`）：
+
+```bash
+cd apps/web && ./node_modules/.bin/vite build   # 或 pnpm run build
+KEY=$(grep -m1 '^RESEND_API_KEY_IDORIS_ONLY_SEND=' ~/Dev/.env | cut -d= -f2-)
+npx -y wrangler@4 pages dev dist --port 8799 --ip 127.0.0.1 \
+  -b RESEND_API_KEY="$KEY" \
+  -b EMAIL_FROM=hello@idoris.ai \
+  -b EMAIL_CODE_SECRET=<任意盐> \
+  -b CF_ROOT_DOMAIN=forest.mushroom.cv \
+  -b SNAPSHOT_HUB=https://testnet.hub.snapshot.org
+```
+
+然后 `POST /api/email-code {email}` → 收码 → `POST /api/register {name,spaceId,email,emailCode}`。
+本地没有 `CF_API_TOKEN`，成功响应里 `domainStatus` 为 `unmanaged`。
+（2026-09-24 实测：`hello@idoris.ai` 真实发出、收到 6 位码、错误码 400 `email_code_mismatch`、正确码 200。）
+
+> ⚠️ **密钥作用域**：`wrangler pages secret put` 写的是 **production** 作用域——一旦设置，
+> 生产注册就会强制要求验证码。只想在 **preview** 开启，必须在 CF 控制台 → Pages 项目 →
+> Settings → Variables and Secrets 的 **Preview** 环境里单独设置；CLI 没有 preview 作用域选项。
 
 前端构建期变量（`VITE_*`）见 `apps/web/.env.example`。
 

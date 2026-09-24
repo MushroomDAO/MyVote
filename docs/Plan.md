@@ -136,8 +136,15 @@
 - [x] `_middleware.ts` 注入 `__TENANT__` 前经 `escapeForScript` 转义 `<` 与 U+2028/2029。
 - [x] 缩小 TOCTOU 竞态：写入随机 reservation 后读回确认，败者返回 409。
       _彻底修复需 Durable Objects（KV 无 CAS）——记为残余风险。_
-- [ ] **鉴权 / 验证码**：注册者身份目前仅前端声明的邮箱，服务端不可信。需产品决策
-      （邮箱验证码 / cos72 登录态 / 钱包对注册请求签名）。
+- [x] **邮箱验证码（M6-3）**：`POST /api/email-code` 经 Resend 发 6 位码（10 分钟、5 次尝试、
+      按 IP + 邮箱双限流），KV 只存加盐 SHA-256；`/api/register` 在 `RESEND_API_KEY` 存在时
+      **强制校验**验证码。**2026-09-24 本地全链路 live 验证**：真实从 `hello@idoris.ai` 发出、
+      一次性邮箱收到码、错误码 400 `email_code_mismatch`、正确码 200。
+      _注意：`wrangler pages secret put` 只能写 **production** 作用域，无法只给 preview 配 key；
+      preview/生产的开启需要在 CF 控制台按环境设置，故本次用 `wrangler pages dev` + `-b` 本地验证。
+      复现见 [`docs/deployment.md`](./deployment.md) §4。_
+- [ ] **更强身份（可选）**：钱包对注册请求签名已支持（见下条 `adminSignature`）；
+      cos72 登录态作为身份来源待外部就绪。
 - [x] **Snapshot 空间所有权校验**（非破坏式）：可选 `adminSignature`/`adminAddress`/`adminTimestamp`；
       `viem.verifyMessage` 验签 + 向 Hub 查 `space.admins`。**提供签名则必须通过**（否则 400），
       不提供则记为 `unverified`（现有邮箱注册流程不变）。见 `lib/ownership.ts`。
