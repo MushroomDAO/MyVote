@@ -122,7 +122,10 @@ export type SxProposal = {
   state: string
   snapshot: number | null
   start: number
+  /** Earliest close (`min_end`). */
   end: number
+  /** Latest close (`max_end`) — SX voting stays open until this. */
+  maxEnd: number
   /** Per-choice scores (the indexer exposes up to three). */
   scores: number[]
   scoresTotal: number
@@ -180,6 +183,7 @@ export function toSxProposal(wire: SxProposalWire): SxProposal {
     snapshot: wire.snapshot === null ? null : Number.parseInt(wire.snapshot, 10),
     start: Number.parseInt(wire.start, 10),
     end: Number.parseInt(wire.min_end, 10),
+    maxEnd: Number.parseInt(wire.max_end, 10),
     scores: [
       wire.scores_1_parsed ?? 0,
       wire.scores_2_parsed ?? 0,
