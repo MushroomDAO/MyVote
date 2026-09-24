@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { privateKeyToAccount } from 'viem/accounts'
 
+import { hashEmailCode } from '../../src/lib/emailCode'
 import { buildOwnershipMessage } from '../../src/lib/ownership'
 import { onRequestPost } from './register'
 
@@ -219,3 +220,83 @@ describe('POST /api/register', () => {
     expect(kv.has(DOMAIN)).toBe(false)
   })
 })
+
+describe('POST /api/register email verification (M6-3)', () => {
+  // No CF credentials: the domain stays unmanaged, so the success path needs no network.
+  const MAIL_ENV = { RESEND_API_KEY: 'k', EMAIL_CODE_SECRET: 'salt' }
+
+  async function seedCode(
+    kv: FakeKV,
+    email: string,
+    code: string,
+    overrides: Record<string, unknown> = {}
+  ) {
+    await kv.put(
+      `ec:${email}`,
+      JSON.stringify({
+        hash: await hashEmailCode(email, code, 'salt'),
+        expiresAt: Math.floor(Date.now() / 1000) + 600,
+        attempts: 0,
+        ...overrides
+      })
+    )
+  }
+
+  it('requires the emailed code once a mail service is configured', async () => {
+    const kv = new FakeKV()
+    const res = await onRequestPost(makeContext(validBody, envWith(kv, MAIL_ENV)))
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'email_code_missing' })
+    expect(kv.has(DOMAIN)).toBe(false)
+  })
+
+  it('accepts a valid code, spends it, and marks the record verified', async () => {
+    const kv = new FakeKV()
+    await seedCode(kv, validBody.email, '123456')
+
+    const res = await onRequestPost(
+      makeContext({ ...validBody, emailCode: '123456' }, envWith(kv, MAIL_ENV))
+    )
+
+    expect(res.status).toBe(200)
+    expect(JSON.parse(kv.raw(DOMAIN) ?? '{}').emailVerified).toBe(true)
+    // The code is single-use.
+    expect(kv.raw(`ec:${validBody.email}`)).toBeUndefined()
+  })
+
+  it('rejects a wrong code and bumps the attempt counter', async () => {
+    const kv = new FakeKV()
+    await seedCode(kv, validBody.email, '123456')
+
+    const res = await onRequestPost(
+      makeContext({ ...validBody, emailCode: '000000' }, envWith(kv, MAIL_ENV))
+    )
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'email_code_mismatch' })
+    expect(JSON.parse(kv.raw(`ec:${validBody.email}`) ?? '{}').attempts).toBe(1)
+    expect(kv.has(DOMAIN)).toBe(false)
+  })
+
+  it('rejects an expired code', async () => {
+    const kv = new FakeKV()
+    await seedCode(kv, validBody.email, '123456', { expiresAt: 1 })
+
+    const res = await onRequestPost(
+      makeContext({ ...validBody, emailCode: '123456' }, envWith(kv, MAIL_ENV))
+    )
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'email_code_expired' })
+  })
+
+  it('stays open without a mail service and records unverified', async () => {
+    const kv = new FakeKV()
+    const res = await onRequestPost(makeContext(validBody, envWith(kv)))
+
+    expect(res.status).toBe(200)
+    expect(JSON.parse(kv.raw(DOMAIN) ?? '{}').emailVerified).toBe(false)
+  })
+})
+
