@@ -12,6 +12,14 @@ binding = "TENANTS_KV"
 id = "b48caba076cb477698121c95f9e69d9e"
 preview_id = "34c1c5f2e50243d1992af2f547151140"
 
+# Registration uniqueness lock. The Durable Object class lives in its own
+# Worker (Pages Functions cannot define one) — see docs/registration-atomicity.md.
+# Migrations belong to that Worker; this binding just points at it.
+[[durable_objects.bindings]]
+name = "TENANT_REGISTRY"
+class_name = "TenantRegistry"
+script_name = "myvote-tenant-registry"
+
 # Environment variables (non-secret)
 # Secrets (CF_API_TOKEN etc.) must be set via:
 #   wrangler pages secret put CF_API_TOKEN --project-name myvote

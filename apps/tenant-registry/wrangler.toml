@@ -1,0 +1,29 @@
+# Registration uniqueness lock — a standalone Worker.
+#
+# Cloudflare Pages Functions cannot define a Durable Object class: the DO has to
+# live in its own Worker, and the Pages project binds to it with `script_name`.
+# See docs/registration-atomicity.md.
+name = "myvote-tenant-registry"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+[[durable_objects.bindings]]
+name = "TENANT_REGISTRY"
+class_name = "TenantRegistry"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TenantRegistry"]
+
+# Preview Pages binds a separate namespace so probe names claimed while testing
+# never block a real registration on production.
+[env.preview]
+name = "myvote-tenant-registry-preview"
+
+[[env.preview.durable_objects.bindings]]
+name = "TENANT_REGISTRY"
+class_name = "TenantRegistry"
+
+[[env.preview.migrations]]
+tag = "v1"
+new_sqlite_classes = ["TenantRegistry"]
