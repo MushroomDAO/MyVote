@@ -41,6 +41,25 @@ export function sxNetworkLabel(id: SxEvmNetworkId | null | undefined): string | 
   return id ? SX_NETWORK_LABELS[id] : null
 }
 
+/** Block explorer per network, for linking a vote's transaction. */
+export const SX_EXPLORERS: Record<SxEvmNetworkId, string> = {
+  ethereum: 'https://etherscan.io',
+  optimism: 'https://optimistic.etherscan.io',
+  arbitrum: 'https://arbiscan.io',
+  base: 'https://basescan.org',
+  sepolia: 'https://sepolia.etherscan.io'
+}
+
+/** Explorer URL for a vote transaction, or null when either part is missing. */
+export function sxTxUrl(
+  network: SxEvmNetworkId | null | undefined,
+  tx: string | null | undefined
+): string | null {
+  if (!network || !tx) return null
+  const explorer = SX_EXPLORERS[network]
+  return explorer ? `${explorer}/tx/${tx}` : null
+}
+
 /**
  * Config for the SX EVM client.
  *

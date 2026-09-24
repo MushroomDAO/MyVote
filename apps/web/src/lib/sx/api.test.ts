@@ -7,6 +7,7 @@ import {
   fetchSxProposals,
   fetchSxSpace,
   fetchSxSpaces,
+  fetchSxVoterVote,
   SX_PROPOSAL_QUERY,
   SX_PROPOSALS_QUERY,
   SX_SPACE_QUERY,
@@ -275,6 +276,43 @@ describe('fetchers', () => {
     })
     const body = JSON.parse((fetchImpl.mock.lastCall![1] as RequestInit).body as string)
     expect(body.variables).toEqual({ space: SPACE_WIRE.id, first: 7, skip: 0 })
+  })
+
+  it('fetchSxVoterVote checksums the voter and maps the indexed vote', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse({
+        data: { votes: [{ id: 'space/1/0xV', choice: 1, vp_parsed: 2.5, tx: '0xtx' }] }
+      })
+    )
+    const vote = await fetchSxVoterVote(
+      'https://api.example',
+      {
+        spaceId: '0xSpace',
+        proposalId: 1,
+        voter: '0x597076433419736483644ce44064e00ac22446a9'
+      },
+      { fetchImpl: fetchImpl as unknown as typeof fetch }
+    )
+
+    expect(vote).toEqual({ id: 'space/1/0xV', choice: 1, vp: 2.5, tx: '0xtx' })
+    const body = JSON.parse((fetchImpl.mock.lastCall![1] as RequestInit).body as string)
+    expect(body.variables).toEqual({
+      space: '0xSpace',
+      proposal: '1',
+      // Checksummed: the indexer matches the address byte-for-byte.
+      voter: '0x597076433419736483644cE44064E00Ac22446a9'
+    })
+    expect(body.query).toContain('$voter: String!')
+  })
+
+  it('fetchSxVoterVote returns null when the account has not voted', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ data: { votes: [] } }))
+    const vote = await fetchSxVoterVote(
+      'https://api.example',
+      { spaceId: '0xSpace', proposalId: 1, voter: '0x597076433419736483644cE44064E00Ac22446a9' },
+      { fetchImpl: fetchImpl as unknown as typeof fetch }
+    )
+    expect(vote).toBeNull()
   })
 
   it('defaults the endpoint to the official indexer', () => {

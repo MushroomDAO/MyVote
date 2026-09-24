@@ -1,19 +1,21 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AppError } from '../lib/errors'
 
 // Unmount between tests so a previous wrapper cannot react to the shared mocks.
 enableAutoUnmount(afterEach)
 
-const { castVote, fetchProposal, signTypedData, fetchSxProposal, sxCastVote } = vi.hoisted(() => ({
-  castVote: vi.fn(),
-  fetchProposal: vi.fn(),
-  signTypedData: vi.fn(),
-  fetchSxProposal: vi.fn(),
-  sxCastVote: vi.fn()
-}))
+const { castVote, fetchProposal, signTypedData, fetchSxProposal, fetchSxVoterVote, sxCastVote } =
+  vi.hoisted(() => ({
+    castVote: vi.fn(),
+    fetchProposal: vi.fn(),
+    signTypedData: vi.fn(),
+    fetchSxProposal: vi.fn(),
+    fetchSxVoterVote: vi.fn(),
+    sxCastVote: vi.fn()
+  }))
 
 vi.mock('../lib/voteBackend', () => ({
   activeVoteBackend: { castVote: (...args: unknown[]) => castVote(...args) }
@@ -26,7 +28,11 @@ vi.mock('../lib/graphql', () => ({
 // Keep the real buildSxVoteRequest; stub only the network fetch.
 vi.mock('../lib/sx/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/sx/api')>()
-  return { ...actual, fetchSxProposal: (...args: unknown[]) => fetchSxProposal(...args) }
+  return {
+    ...actual,
+    fetchSxProposal: (...args: unknown[]) => fetchSxProposal(...args),
+    fetchSxVoterVote: (...args: unknown[]) => fetchSxVoterVote(...args)
+  }
 })
 
 vi.mock('../lib/sx/provider', () => ({
@@ -81,7 +87,9 @@ const i18n = createI18n({
       noWallet: 'NO_WALLET',
       noAccount: 'NO_ACCOUNT',
       retry: 'Retry',
-      voteSubmitted: 'VOTE_SUBMITTED'
+      voteSubmitted: 'VOTE_SUBMITTED',
+      sxAlreadyVoted: 'SX_ALREADY_VOTED',
+      sxViewTx: 'VIEW_TX'
     }
   }
 })
@@ -145,6 +153,11 @@ async function mountAndVote() {
   await flushPromises()
   return wrapper
 }
+
+beforeEach(() => {
+  // Default: the connected account has no indexed on-chain vote.
+  fetchSxVoterVote.mockResolvedValue(null)
+})
 
 afterEach(() => {
   vi.resetAllMocks()
@@ -248,6 +261,53 @@ describe('ProposalPage error recovery', () => {
   })
 })
 
+describe('ProposalPage existing on-chain vote', () => {
+  it('disables submit and links the transaction when the indexer has a vote', async () => {
+    routeState.params = { id: '12' }
+    routeState.query = { space: SX_SPACE }
+    authState.providerId = 'wallet'
+    authState.user = { address: '0x1111111111111111111111111111111111111111' }
+    fetchSxProposal.mockResolvedValue(sxProposal())
+    fetchSxVoterVote.mockResolvedValue({
+      id: SX_SPACE + '/12/0x1111111111111111111111111111111111111111',
+      choice: 1,
+      vp: 1,
+      tx: '0xdeadbeef'
+    })
+
+    const wrapper = mount(ProposalPage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    // The lookup is scoped to this space + proposal + voter.
+    expect(fetchSxVoterVote).toHaveBeenCalledWith(
+      expect.any(String),
+      { spaceId: SX_SPACE, proposalId: 12, voter: '0x1111111111111111111111111111111111111111' },
+      { signal: expect.any(AbortSignal) }
+    )
+    expect(wrapper.get('.submit').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('SX_ALREADY_VOTED')
+    expect(wrapper.get('.sxVoteLink').attributes('href')).toBe(
+      'https://optimistic.etherscan.io/tx/0xdeadbeef'
+    )
+  })
+
+  it('keeps submit enabled when the lookup finds nothing', async () => {
+    routeState.params = { id: '12' }
+    routeState.query = { space: SX_SPACE }
+    authState.providerId = 'wallet'
+    authState.user = { address: '0x1111111111111111111111111111111111111111' }
+    fetchSxProposal.mockResolvedValue(sxProposal())
+    fetchSxVoterVote.mockResolvedValue(null)
+
+    const wrapper = mount(ProposalPage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    // The button stays enabled; the authenticator is the real gate.
+    expect(wrapper.find('.sxVoteNote').exists()).toBe(false)
+    expect(wrapper.get('.submit').attributes('disabled')).toBeUndefined()
+  })
+})
+
 describe('ProposalPage Snapshot X', () => {
   it('reads an SX proposal from the indexer and shows the on-chain badge', async () => {
     routeState.params = { id: '12' }
@@ -277,7 +337,7 @@ describe('ProposalPage Snapshot X', () => {
     sxCastVote.mockResolvedValue({ id: 'sx-receipt' })
     ;(window as unknown as { ethereum?: unknown }).ethereum = { request: vi.fn() }
 
-    await mountAndVote()
+    const wrapper = await mountAndVote()
 
     expect(sxCastVote).toHaveBeenCalledTimes(1)
     const [request] = sxCastVote.mock.calls[0] as [Record<string, unknown>]
@@ -291,6 +351,9 @@ describe('ProposalPage Snapshot X', () => {
     expect(castVote).not.toHaveBeenCalled()
     // Nor is the off-chain proposal re-read after an on-chain vote.
     expect(fetchProposal).not.toHaveBeenCalled()
+    // An on-chain vote cannot be repeated, so submit is now disabled.
+    expect(wrapper.get('.submit').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('SX_ALREADY_VOTED')
   })
 
   it('disables submit on a closed on-chain proposal', async () => {

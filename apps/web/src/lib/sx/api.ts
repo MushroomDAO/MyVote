@@ -1,3 +1,5 @@
+import { getAddress } from 'viem'
+
 import {
   SX_API_DEFAULT,
   type SxEvmNetworkId,
@@ -40,6 +42,11 @@ export const SX_PROPOSALS_QUERY =
   'scores_total vote_count ' +
   STRATEGY_FIELDS +
   ' } }'
+
+export const SX_VOTER_VOTE_QUERY =
+  'query VoterVote($space: String!, $proposal: String!, $voter: String!) { ' +
+  'votes(first: 1, where: { space: $space, proposal: $proposal, voter: $voter }) { ' +
+  'id choice vp_parsed tx } }'
 
 export const SX_PROPOSAL_QUERY =
   'query Proposal($id: String!) { proposal(id: $id) { ' +
@@ -332,6 +339,49 @@ export async function fetchSxProposals(
     options
   )
   return (data.proposals ?? []).map(toSxProposal)
+}
+
+export type SxVote = {
+  id: string
+  choice: number
+  /** Voting power, already scaled by the space's vp_decimals. */
+  vp: number | null
+  /** On-chain transaction hash, when the indexer has it. */
+  tx: string | null
+}
+
+type SxVoteWire = { id: string; choice: number; vp_parsed: number | null; tx: string | null }
+
+/**
+ * The connected account's vote on one proposal, or null when it has not voted.
+ * This is what makes an on-chain vote un-repeatable in the UI: the indexer knows,
+ * and the authenticator rejects a second vote.
+ */
+export async function fetchSxVoterVote(
+  endpoint: string = SX_API_DEFAULT,
+  params: { spaceId: string; proposalId: number | string; voter: string },
+  options: SxFetchOptions = {}
+): Promise<SxVote | null> {
+  const data = await sxGraphqlRequest<{ votes: SxVoteWire[] }>(
+    endpoint,
+    SX_VOTER_VOTE_QUERY,
+    {
+      space: params.spaceId,
+      // The indexer filters `proposal` by the numeric id, not the composite one.
+      proposal: String(params.proposalId),
+      // ... and matches the voter byte-for-byte, so checksum it first.
+      voter: getAddress(params.voter)
+    },
+    options
+  )
+  const vote = data.votes?.[0]
+  if (!vote) return null
+  return {
+    id: vote.id,
+    choice: Number(vote.choice),
+    vp: vote.vp_parsed === null || vote.vp_parsed === undefined ? null : Number(vote.vp_parsed),
+    tx: vote.tx ?? null
+  }
 }
 
 export async function fetchSxProposal(
