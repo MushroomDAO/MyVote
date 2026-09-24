@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale, type AppLocale } from './i18n'
 import { useAuth } from './auth/useAuth'
@@ -11,6 +11,12 @@ const auth = useAuth()
 // MV-4: in SSO-only mode — or once a cos72 session exists — the wallet provider
 // is not an option, and AirAccount is the only entry in the dropdown.
 const walletDisabled = auth.walletDisabled
+
+const emailInput = ref('')
+// Email sign-in is the interim M4 substitute and needs the address typed in.
+const needsEmail = computed(
+  () => auth.activeProviderId.value === 'email' && !auth.isConnected.value
+)
 
 onMounted(() => {
   // Consumes a `?code=` from cos72, or revalidates a stored token. Silent by design.
@@ -29,10 +35,10 @@ const selectedProvider = computed({
   }
 })
 
-const shortAddress = computed(() => {
+const accountLabel = computed(() => {
   const address = auth.user.value?.address
-  if (!address) return ''
-  return `${address.slice(0, 6)}…${address.slice(-4)}`
+  if (address) return `${address.slice(0, 6)}…${address.slice(-4)}`
+  return auth.user.value?.displayName ?? ''
 })
 
 async function onConnectClick() {
@@ -40,7 +46,7 @@ async function onConnectClick() {
     await auth.disconnect()
     return
   }
-  await auth.connect()
+  await auth.connect(needsEmail.value ? { email: emailInput.value } : undefined)
 }
 </script>
 
@@ -60,14 +66,10 @@ async function onConnectClick() {
 
       <div class="actions">
         <label class="label" for="provider">{{ t('loginProvider') }}</label>
-        <select
-          id="provider"
-          v-model="selectedProvider"
-          class="select"
-          :disabled="walletDisabled"
-        >
+        <select id="provider" v-model="selectedProvider" class="select">
           <option v-if="!walletDisabled" value="wallet">Wallet</option>
           <option value="airaccount">AirAccount</option>
+          <option value="email">{{ t('emailLogin') }}</option>
         </select>
 
         <label class="label" for="lang">{{ t('language') }}</label>
@@ -76,11 +78,20 @@ async function onConnectClick() {
           <option value="en">English</option>
         </select>
 
+        <input
+          v-if="needsEmail"
+          v-model="emailInput"
+          class="input"
+          type="email"
+          autocomplete="email"
+          :placeholder="t('emailPlaceholder')"
+        />
+
         <button class="button" type="button" @click="onConnectClick">
           {{ auth.isConnected ? t('logout') : t('login') }}
         </button>
 
-        <div v-if="auth.isConnected" class="address">{{ shortAddress }}</div>
+        <div v-if="auth.isConnected" class="address">{{ accountLabel }}</div>
       </div>
     </header>
 
@@ -142,7 +153,8 @@ async function onConnectClick() {
   color: var(--mv-muted);
 }
 
-.select {
+.select,
+.input {
   border: 1px solid var(--mv-border-md);
   border-radius: 8px;
   padding: 6px 8px;

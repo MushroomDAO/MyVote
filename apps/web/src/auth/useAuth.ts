@@ -1,13 +1,14 @@
 import { computed, ref } from 'vue'
 
 import { SSO_ONLY } from '../config'
-import type { AuthProvider, AuthProviderId, AuthUser } from './types'
+import type { AuthConnectParams, AuthProvider, AuthProviderId, AuthUser } from './types'
 import {
   createAirAccountBridge,
   SsoCodeRejectedError,
   SsoRedirectingError
 } from './airAccountBridge'
 import { createAirAccountProvider } from './airAccountProvider'
+import { createEmailProvider } from './emailProvider'
 import { createWalletProvider } from './walletProvider'
 
 /**
@@ -20,7 +21,10 @@ export const airAccountBridge = createAirAccountBridge()
 
 const providersById: Record<AuthProviderId, AuthProvider> = {
   wallet: createWalletProvider(),
-  airaccount: createAirAccountProvider(airAccountBridge)
+  airaccount: createAirAccountProvider(airAccountBridge),
+  // Interim M4 substitute while cos72 SSO + E-5 KMS are blocked. Identity only —
+  // it cannot sign votes (see auth/emailProvider.ts).
+  email: createEmailProvider()
 }
 
 /** True when a login code is in the URL, or a live SSO session is stored. */
@@ -63,10 +67,10 @@ export function useAuth() {
     activeProviderId.value = id
   }
 
-  async function connect() {
+  async function connect(params?: AuthConnectParams) {
     error.value = null
     try {
-      user.value = await provider.value.connect()
+      user.value = await provider.value.connect(params)
     } catch (e) {
       // The AirAccount provider "fails" by navigating to cos72. The page is on
       // its way out — don't flash an error banner on the way.

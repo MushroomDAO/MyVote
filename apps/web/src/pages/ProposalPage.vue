@@ -7,6 +7,7 @@ import DOMPurify from 'dompurify'
 
 import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME } from '../config'
 import { useAuth } from '../auth/useAuth'
+import { EmailSigningUnsupportedError } from '../auth/emailProvider'
 import { KmsNotConfiguredError } from '../auth/kms'
 import { fetchProposal, type Proposal, type ProposalType } from '../lib/graphql'
 import { createRequestGuard } from '../lib/requestGuard'
@@ -118,6 +119,11 @@ async function submitVote() {
     // Sign through the active auth provider — wallet or AirAccount/KMS. The page
     // no longer touches window.ethereum, and submission goes through the active
     // VoteBackend, so both the auth and protocol seams hold.
+    // Email sign-in is identity-only (interim M4) — no key, so no signature.
+    if (auth.activeProviderId.value === 'email') {
+      throw new EmailSigningUnsupportedError()
+    }
+
     const address = auth.user.value?.address
     if (!address) throw new Error(t('noAccount'))
 
@@ -139,6 +145,9 @@ async function submitVote() {
     if (e instanceof KmsNotConfiguredError) {
       // Expected until E-5 lands: AirAccount signing has no backend yet.
       voteError.value = t('kmsPending')
+    } else if (e instanceof EmailSigningUnsupportedError) {
+      // Expected for the interim email identity: it holds no key.
+      voteError.value = t('emailSigningUnsupported')
     } else {
       voteError.value = e instanceof Error ? e.message : String(e)
     }
