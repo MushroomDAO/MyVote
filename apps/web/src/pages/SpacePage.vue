@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 
 import { GRAPHQL_ENDPOINT, SX_API_ENDPOINT } from '../config'
 import { fetchSpaceWithProposals, type ProposalListItem, type Space } from '../lib/graphql'
+import { takePage } from '../lib/pageCursor'
 import { createRequestGuard } from '../lib/requestGuard'
 import { fetchSxProposals, fetchSxSpace, type SxProposal } from '../lib/sx/api'
 import { sxNetworkLabel } from '../lib/sx/backend'
@@ -70,7 +71,7 @@ async function loadSpace(skip: number) {
       // On-chain space: read from the SX indexer instead of the off-chain Hub.
       const [sxSpace, page] = await Promise.all([
         fetchSxSpace(SX_API_ENDPOINT, spaceId.value, { signal }),
-        fetchSxProposals(SX_API_ENDPOINT, spaceId.value, { first: PAGE_SIZE, skip, signal })
+        fetchSxProposals(SX_API_ENDPOINT, spaceId.value, { first: PAGE_SIZE + 1, skip, signal })
       ])
       if (!guard.isCurrent(token)) return
 
@@ -80,27 +81,28 @@ async function loadSpace(skip: number) {
       sxMeta.value = sxSpace
         ? { network: sxNetworkLabel(sxSpace.network), proposalCount: sxSpace.proposalCount }
         : null
-      const items = page.map(sxListItem)
-      proposals.value = skip === 0 ? items : [...proposals.value, ...items]
-      hasMore.value = page.length === PAGE_SIZE
+      const { page: sxPage, hasMore: sxMore } = takePage(page.map(sxListItem), PAGE_SIZE)
+      proposals.value = skip === 0 ? sxPage : [...proposals.value, ...sxPage]
+      hasMore.value = sxMore
       return
     }
 
     const data = await fetchSpaceWithProposals(GRAPHQL_ENDPOINT, {
       spaceId: spaceId.value,
-      first: PAGE_SIZE,
+      first: PAGE_SIZE + 1,
       skip,
       signal
     })
     if (!guard.isCurrent(token)) return
 
+    const { page, hasMore: more } = takePage(data.proposals, PAGE_SIZE)
     if (skip === 0) {
       space.value = data.space
-      proposals.value = data.proposals
+      proposals.value = page
     } else {
-      proposals.value = [...proposals.value, ...data.proposals]
+      proposals.value = [...proposals.value, ...page]
     }
-    hasMore.value = data.proposals.length === PAGE_SIZE
+    hasMore.value = more
   } catch (e) {
     if (!guard.isCurrent(token)) return
     error.value = e instanceof Error ? e.message : String(e)
