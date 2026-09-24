@@ -13,7 +13,7 @@
 | `CLAUDE.md` 过时（测试运行器 / hub / 组件缺失） | ✅ 已重写（含 Functions、错误码、默认 testnet hub、环境变量表） |
 | M2 文档清单未勾选、`tenants.json` 描述过时 | ✅ M2 文档按 KV + 自助注册重写；`apps/web/tenants.json` 已删除 |
 | `POST /api/register` 无鉴权 / 限流 | 🟡 已加按 IP 限流（#11）与**空间所有权校验**（#20）；验证码/身份待邮箱服务（M6-3） |
-| 注册 TOCTOU 竞态 | 🟡 写入 reservation 后读回确认（#11）；彻底修复需 Durable Objects（KV 无 CAS） |
+| 注册 TOCTOU 竞态 | ✅ 已关闭：独立 Worker 的 Durable Object 按域名原子认领（#80），本地 5 并发同名注册只 1 个成功；见 `docs/registration-atomicity.md` |
 | `_middleware` 注入 `__TENANT__` 未转义 `<` | ✅ `escapeForScript`（#11） |
 | `register.ts` 吞掉 CF 域名注册失败 | ✅ 失败**回滚 KV 并返回 502**（#14），成功/未托管写入 `domainStatus` |
 | 读取路径无取消 / 去重 | ✅ 过期响应令牌守卫（#6）；`AbortController` 取消已接入读取层与三个页面（#41/#42），读取失败可重试 |

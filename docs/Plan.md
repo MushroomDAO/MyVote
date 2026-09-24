@@ -76,6 +76,9 @@
       `m/44'/60'/0'/0/0` 会被拒；故会话除 token 外还要带 `hdPath`，signer 已支持按请求传入。_
 - [ ] **E-5（生产接线）**：cos72 在 SSO 交换结果里返回 agent JWT 及其 `hdPath`；MyVote
       侧已就绪（`KmsSignContext.token` + `hdPath`）。
+      _2026-09-24：已把要对接的接口/字段/错误语义写成可转发文档
+      [`docs/cos72-airaccount-requirements.md`](./cos72-airaccount-requirements.md)（含最小闭环：
+      给一个测试 `agentJwt` + `hdPath` + AA 地址即可在预览跑通）。_
 - [ ] **cos72**：SSO 授权落地页（`/sso/authorize` 前的第一方页面）上线；`VITE_COS72_AUTHORIZE_URL` 指向它。
 - [ ] cos72 refresh endpoint 就绪后，把 SSO token 从 `sessionStorage` 迁到内存 + HttpOnly 刷新 Cookie。
 - [ ] E2E：Web2 登录 → 投票全链路。
@@ -144,8 +147,13 @@
 - [x] 按 IP 限流：`register` 5/时、`check` 120/分（KV 固定窗口，尽力而为，见 `lib/rateLimit.ts`）。
 - [x] 校验 `spaceId` 格式（ENS / Snapshot X hex），拒绝空白与分隔符。
 - [x] `_middleware.ts` 注入 `__TENANT__` 前经 `escapeForScript` 转义 `<` 与 U+2028/2029。
-- [x] 缩小 TOCTOU 竞态：写入随机 reservation 后读回确认，败者返回 409。
-      _彻底修复需 Durable Objects（KV 无 CAS）——记为残余风险。_
+- [x] **关闭 TOCTOU 竞态**（原「残余风险」已消除）：社区名的认领改为一个域名一个 **Durable Object**
+      （独立 Worker `apps/tenant-registry/`，Pages 用 `script_name` 绑定），同名请求在单线程对象里
+      串行 → 「一个名字只能被认领一次」是硬保证；CF 域名注册失败会 `delete KV + release`，名字可重试。
+      `TENANT_REGISTRY` 未绑定时回退旧的 KV reserve+read-back（便于灰度/回滚）。
+      **2026-09-24 本地真 DO 并发验证**：5 个并发同名注册 → 恰好 1×200 + 4×409。
+      方案与踩坑见 [`docs/registration-atomicity.md`](./registration-atomicity.md)。
+      _关键修正：Pages Functions 不能自己声明 DO class，必须独立 Worker（官方明确要求），故原方案改过一版。_
 - [x] **邮箱验证码（M6-3）**：`POST /api/email-code` 经 Resend 发 6 位码（10 分钟、5 次尝试、
       按 IP + 邮箱双限流），KV 只存加盐 SHA-256；`/api/register` 在 `RESEND_API_KEY` 存在时
       **强制校验**验证码。**2026-09-24 本地全链路 live 验证**：真实从 `hello@idoris.ai` 发出、
@@ -225,6 +233,8 @@
 - 历史调研（含过时结论）：[`docs/SnapshotX.md`](./SnapshotX.md)
 - 测试网 Space 全流程（链下）：[`docs/testnet-space-e2e.md`](./testnet-space-e2e.md)
 - SX 测试网实测（链上）：[`docs/sx-testnet.md`](./sx-testnet.md)
+- 注册原子化方案：[`docs/registration-atomicity.md`](./registration-atomicity.md)
+- M4 对接诉求：[`docs/cos72-airaccount-requirements.md`](./cos72-airaccount-requirements.md)
 - 多租户实现：[`docs/M2-multi-tenant.md`](./M2-multi-tenant.md)
 - 仓库架构评审：[`docs/architecture-review.md`](./architecture-review.md)
 - 开发循环与 pre-PR：[`docs/development-loop.md`](./development-loop.md)
