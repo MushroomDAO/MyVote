@@ -5,11 +5,14 @@ import { useI18n } from 'vue-i18n'
 import { GRAPHQL_ENDPOINT } from '../config'
 import { fetchSpaces, type Space } from '../lib/graphql'
 import { cacheGet, cacheSet, cacheDelete } from '../lib/cache'
+import { createRequestGuard } from '../lib/requestGuard'
 
 const { t } = useI18n()
 
 const PAGE_SIZE = 30
 const CACHE_KEY = 'explore:spaces'
+
+const guard = createRequestGuard()
 
 const spaces = ref<Space[]>([])
 const loading = ref(false)
@@ -36,8 +39,10 @@ async function loadSpaces(skip: number, forceRefresh = false) {
     loadingMore.value = true
   }
   error.value = null
+  const token = guard.next()
   try {
     const data = await fetchSpaces(GRAPHQL_ENDPOINT, { first: PAGE_SIZE, skip })
+    if (!guard.isCurrent(token)) return
     const newItems = data.spaces
     if (skip === 0) {
       spaces.value = newItems
@@ -47,10 +52,13 @@ async function loadSpaces(skip: number, forceRefresh = false) {
     }
     hasMore.value = newItems.length === PAGE_SIZE
   } catch (e) {
+    if (!guard.isCurrent(token)) return
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
-    loading.value = false
-    loadingMore.value = false
+    if (guard.isCurrent(token)) {
+      loading.value = false
+      loadingMore.value = false
+    }
   }
 }
 
