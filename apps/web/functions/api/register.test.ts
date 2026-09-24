@@ -4,7 +4,9 @@
 // stubbed global fetch, so the Workers-specific wiring (rollback, status,
 // rate limiting) is exercised rather than only its extracted helpers.
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { privateKeyToAccount } from 'viem/accounts'
 
+import { buildOwnershipMessage } from '../../src/lib/ownership'
 import { onRequestPost } from './register'
 
 class FakeKV {
@@ -54,6 +56,19 @@ function envWith(kv: FakeKV, extra: Record<string, unknown> = {}) {
 const CF_ENV = { CF_API_TOKEN: 't', CF_ACCOUNT_ID: 'a', CF_PAGES_PROJECT: 'myvote' }
 const validBody = { name: 'breadshop', spaceId: 'ens.eth', email: 'a@example.com' }
 
+// A throwaway key — real signatures, so the viem verification path is exercised.
+const ACCOUNT = privateKeyToAccount(
+  '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d'
+)
+
+async function ownershipProof(domain: string, timestamp: number) {
+  return ACCOUNT.signMessage({ message: buildOwnershipMessage(domain, timestamp) })
+}
+
+function hubAdmins(admins: string[]) {
+  return cfResponse({ data: { space: { admins } } })
+}
+
 function cfResponse(body: unknown) {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -91,8 +106,81 @@ describe('POST /api/register', () => {
     const res = await onRequestPost(makeContext(validBody, envWith(kv)))
 
     expect(res.status).toBe(200)
-    expect(await res.json()).toMatchObject({ success: true, domainStatus: 'unmanaged' })
+    expect(await res.json()).toMatchObject({
+      success: true,
+      domainStatus: 'unmanaged',
+      ownership: 'unverified'
+    })
     expect(JSON.parse(kv.raw(DOMAIN) ?? '{}').domainStatus).toBe('unmanaged')
+  })
+
+  it('verifies an ownership proof signed by a space admin', async () => {
+    const kv = new FakeKV()
+    const timestamp = Date.now()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(hubAdmins([ACCOUNT.address])))
+
+    const res = await onRequestPost(
+      makeContext(
+        {
+          ...validBody,
+          adminAddress: ACCOUNT.address,
+          adminTimestamp: timestamp,
+          adminSignature: await ownershipProof(DOMAIN, timestamp)
+        },
+        envWith(kv)
+      )
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ success: true, ownership: 'verified' })
+    expect(JSON.parse(kv.raw(DOMAIN) ?? '{}').ownership).toBe('verified')
+  })
+
+  it('rejects an ownership proof from a non-admin signer', async () => {
+    const kv = new FakeKV()
+    const timestamp = Date.now()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(hubAdmins(['0x0000000000000000000000000000000000000001']))
+    )
+
+    const res = await onRequestPost(
+      makeContext(
+        {
+          ...validBody,
+          adminAddress: ACCOUNT.address,
+          adminTimestamp: timestamp,
+          adminSignature: await ownershipProof(DOMAIN, timestamp)
+        },
+        envWith(kv)
+      )
+    )
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'Space ownership proof was rejected' })
+    expect(kv.has(DOMAIN)).toBe(false)
+  })
+
+  it('rejects a stale ownership proof without contacting the Hub', async () => {
+    const kv = new FakeKV()
+    const stale = Date.now() - 60 * 60 * 1000
+    const fetchImpl = vi.fn()
+    vi.stubGlobal('fetch', fetchImpl)
+
+    const res = await onRequestPost(
+      makeContext(
+        {
+          ...validBody,
+          adminAddress: ACCOUNT.address,
+          adminTimestamp: stale,
+          adminSignature: await ownershipProof(DOMAIN, stale)
+        },
+        envWith(kv)
+      )
+    )
+
+    expect(res.status).toBe(400)
+    expect(fetchImpl).not.toHaveBeenCalled()
   })
 
   it('marks the domain active when CF registration succeeds', async () => {
