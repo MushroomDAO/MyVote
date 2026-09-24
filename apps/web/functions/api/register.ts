@@ -19,6 +19,8 @@ interface Env {
   CF_ZONE_ID: string
   CF_PAGES_PROJECT: string
   CF_ROOT_DOMAIN: string
+  /** Snapshot Hub used to look up a space's admins for the ownership proof. */
+  SNAPSHOT_HUB?: string
 }
 
 type RegisterBody = {
@@ -27,17 +29,97 @@ type RegisterBody = {
   description?: string
   /** Registrant contact email (M4-B interim identity). Stored as contact only. */
   email?: string
+  /** Optional space-ownership proof: a personal_sign over the ownership message. */
+  adminSignature?: string
+  adminAddress?: string
+  adminTimestamp?: number
 }
 
 // Shared with the app (single tested source) — functions are bundled by esbuild,
 // so relative imports into src are fine as long as the modules stay browser-free.
+import { verifyMessage } from 'viem'
+
 import { domainOutcome } from '../../src/lib/domainRegistration'
 import { isValidEmail } from '../../src/lib/email'
+import {
+  buildOwnershipMessage,
+  isFreshTimestamp,
+  ownershipVerdict,
+  type OwnershipVerdict
+} from '../../src/lib/ownership'
 import { hitRateLimit } from '../../src/lib/rateLimit'
 import { isValidSpaceId, isValidSubdomain } from '../../src/lib/registration'
 
 /** Registration attempts allowed per IP per hour. */
 const REGISTER_LIMIT = 5
+
+/** Keep in sync with the frontend's VITE_SNAPSHOT_HUB. */
+const DEFAULT_SNAPSHOT_HUB = 'https://testnet.hub.snapshot.org'
+
+/** Space admins, or null when the Hub could not answer. */
+async function fetchSpaceAdmins(hubUrl: string, spaceId: string): Promise<string[] | null> {
+  try {
+    const res = await fetch(hubUrl.replace(/\/+$/, '') + '/graphql', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        query: 'query SpaceAdmins($id: String!) { space(id: $id) { admins } }',
+        variables: { id: spaceId }
+      })
+    })
+    if (!res.ok) return null
+    const json = (await res.json()) as { data?: { space?: { admins?: unknown } } }
+    const admins = json?.data?.space?.admins
+    return Array.isArray(admins) ? (admins as string[]) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Resolves the ownership verdict for a registration.
+ *
+ * No proof → 'unverified' (the existing flow is unchanged). A supplied proof is
+ * an assertion: a bad signature, a stale timestamp, a non-admin signer, or a Hub
+ * we cannot reach all yield 'reject'.
+ */
+async function resolveOwnership(
+  hubUrl: string,
+  input: {
+    domain: string
+    spaceId: string
+    adminSignature?: string
+    adminAddress?: string
+    adminTimestamp?: number
+  }
+): Promise<OwnershipVerdict> {
+  const provided = Boolean(input.adminSignature && input.adminAddress && input.adminTimestamp)
+  if (!provided) return ownershipVerdict({ proofProvided: false, signerIsAdmin: null })
+
+  const signature = input.adminSignature as string
+  const address = input.adminAddress as string
+  const timestamp = input.adminTimestamp as number
+
+  if (!isFreshTimestamp(timestamp, Date.now())) return 'reject'
+
+  let valid = false
+  try {
+    valid = await verifyMessage({
+      address: address as `0x${string}`,
+      message: buildOwnershipMessage(input.domain, timestamp),
+      signature: signature as `0x${string}`
+    })
+  } catch {
+    return 'reject'
+  }
+  if (!valid) return 'reject'
+
+  const admins = await fetchSpaceAdmins(hubUrl, input.spaceId)
+  const signerIsAdmin =
+    admins === null ? null : admins.some((a) => a.toLowerCase() === address.toLowerCase())
+
+  return ownershipVerdict({ proofProvided: true, signerIsAdmin })
+}
 
 async function cfApi(token: string, path: string, method: string, body?: unknown) {
   const res = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
@@ -99,6 +181,21 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const rootDomain = context.env.CF_ROOT_DOMAIN ?? 'forest.mushroom.cv'
   const domain = `${name}.${rootDomain}`
 
+  // --- Ownership proof (optional; reject only when a proof is asserted) ---
+  const ownership = await resolveOwnership(context.env.SNAPSHOT_HUB ?? DEFAULT_SNAPSHOT_HUB, {
+    domain,
+    spaceId,
+    adminSignature: body.adminSignature,
+    adminAddress: body.adminAddress,
+    adminTimestamp: body.adminTimestamp
+  })
+  if (ownership === 'reject') {
+    return Response.json(
+      { error: 'Space ownership proof was rejected', domain },
+      { status: 400 }
+    )
+  }
+
   // --- Uniqueness check ---
   const existing = await context.env.TENANTS_KV.get(domain)
   if (existing !== null) {
@@ -122,6 +219,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     // Contact only. _middleware allowlists which fields reach window.__TENANT__,
     // so this never becomes public page source.
     contactEmail: email,
+    // 'verified' | 'unverified' — see lib/ownership.ts.
+    ownership,
     createdAt: new Date().toISOString(),
     _reservation: reservation,
   }
@@ -175,5 +274,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     spaceId,
     name,
     domainStatus: outcome.kind,
+    ownership,
   })
 }

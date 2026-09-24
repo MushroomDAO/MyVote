@@ -35,6 +35,9 @@ export const SX_API_ENDPOINT = stripTrailingSlash(
   getEnv('VITE_SX_API') ?? 'https://api.snapshot.box'
 )
 
+/** Root domain community subdomains are issued under (must match the edge's CF_ROOT_DOMAIN). */
+export const REGISTER_ROOT_DOMAIN = getEnv('VITE_REGISTER_ROOT_DOMAIN') ?? 'forest.mushroom.cv'
+
 /**
  * cos72 backend origin (scheme + host, no path). The SSO endpoints live under
  * `${VITE_COS72_API}/api/v1`. Empty when unset — the AirAccount bridge then

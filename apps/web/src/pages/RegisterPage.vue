@@ -2,10 +2,14 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { REGISTER_ROOT_DOMAIN } from '../config'
+import { useAuth } from '../auth/useAuth'
 import { isValidEmail } from '../lib/email'
+import { buildOwnershipMessage } from '../lib/ownership'
 import { isValidSubdomain } from '../lib/registration'
 
 const { t } = useI18n()
+const auth = useAuth()
 
 const name = ref('')
 const spaceId = ref('')
@@ -23,6 +27,13 @@ const successUrl = ref<string | null>(null)
 const nameLower = computed(() => name.value.toLowerCase().trim())
 const isValidName = computed(() => isValidSubdomain(nameLower.value))
 const isEmailValid = computed(() => isValidEmail(email.value))
+/** Same domain the edge computes, so the signed message matches byte-for-byte. */
+const domain = computed(() => `${nameLower.value}.${REGISTER_ROOT_DOMAIN}`)
+
+// --- Optional space-ownership proof (see lib/ownership.ts) ---
+const ownershipStatus = ref<'none' | 'signing' | 'verified' | 'error'>('none')
+const ownershipError = ref<string | null>(null)
+const ownershipProof = ref<{ address: string; timestamp: number; signature: string } | null>(null)
 
 let checkTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -30,6 +41,10 @@ function onNameInput() {
   nameStatus.value = 'idle'
   checkError.value = null
   successUrl.value = null
+  // The signed message embeds the domain, so a rename invalidates any proof.
+  ownershipProof.value = null
+  ownershipStatus.value = 'none'
+  ownershipError.value = null
   if (checkTimer) clearTimeout(checkTimer)
   if (!nameLower.value) return
   if (!isValidName.value) {
@@ -60,6 +75,33 @@ async function checkName() {
   }
 }
 
+/**
+ * Optional: sign a timestamped message so the API can verify the signer is an
+ * admin of the space. Skipping it still registers (recorded as 'unverified').
+ */
+async function signOwnership() {
+  ownershipError.value = null
+  ownershipStatus.value = 'signing'
+  try {
+    if (!spaceId.value.trim()) throw new Error(t('snapshotSpaceId'))
+    if (!auth.isConnected.value) await auth.connect()
+    const address = auth.user.value?.address
+    if (!address) throw new Error(t('noAccount'))
+
+    const timestamp = Date.now()
+    const signature = await auth.provider.value.signMessage(
+      address,
+      buildOwnershipMessage(domain.value, timestamp)
+    )
+    ownershipProof.value = { address, timestamp, signature }
+    ownershipStatus.value = 'verified'
+  } catch (e) {
+    ownershipProof.value = null
+    ownershipStatus.value = 'error'
+    ownershipError.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
 async function onSubmit() {
   if (nameStatus.value !== 'available') return
   if (!spaceId.value.trim()) return
@@ -79,7 +121,14 @@ async function onSubmit() {
         name: nameLower.value,
         spaceId: spaceId.value.trim(),
         description: description.value.trim(),
-        email: email.value.trim().toLowerCase()
+        email: email.value.trim().toLowerCase(),
+        ...(ownershipProof.value
+          ? {
+              adminAddress: ownershipProof.value.address,
+              adminTimestamp: ownershipProof.value.timestamp,
+              adminSignature: ownershipProof.value.signature
+            }
+          : {})
       })
     })
     const data = await res.json() as { success?: boolean; url?: string; error?: string }
@@ -125,7 +174,7 @@ async function onSubmit() {
             placeholder="bread"
             @input="onNameInput"
           />
-          <span class="domain">.forest.mushroom.cv</span>
+          <span class="domain">.{{ REGISTER_ROOT_DOMAIN }}</span>
         </div>
         <div class="hint">{{ t('communityNameHint') }}</div>
         <div v-if="checking" class="statusChecking">{{ t('checking') }}</div>
@@ -171,6 +220,23 @@ async function onSubmit() {
           placeholder="you@example.com"
         />
         <div class="hint">{{ t('contactEmailHint') }}</div>
+      </div>
+
+      <div class="field">
+        <label class="label">{{ t('ownershipTitle') }}</label>
+        <div class="hint">{{ t('ownershipHint') }}</div>
+        <button
+          class="ownershipBtn"
+          type="button"
+          :disabled="ownershipStatus === 'signing' || !spaceId.trim()"
+          @click="signOwnership"
+        >
+          {{ ownershipStatus === 'signing' ? t('ownershipSigning') : t('ownershipVerify') }}
+        </button>
+        <div v-if="ownershipStatus === 'verified'" class="statusOk">
+          ✓ {{ t('ownershipVerified') }}
+        </div>
+        <div v-if="ownershipError" class="statusErr">{{ ownershipError }}</div>
       </div>
 
       <div v-if="submitError" class="submitError">{{ t('registerError') }}: {{ submitError }}</div>
@@ -317,6 +383,22 @@ async function onSubmit() {
 .textarea:focus {
   outline: none;
   border-color: var(--mv-primary);
+}
+
+.ownershipBtn {
+  margin-top: 8px;
+  border: 1px solid var(--mv-border-md);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.ownershipBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .submitBtn {
