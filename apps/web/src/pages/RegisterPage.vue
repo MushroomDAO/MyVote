@@ -2,11 +2,14 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { isValidEmail } from '../lib/email'
+
 const { t } = useI18n()
 
 const name = ref('')
 const spaceId = ref('')
 const description = ref('')
+const email = ref('')
 
 const checking = ref(false)
 const nameStatus = ref<'idle' | 'available' | 'taken' | 'invalid'>('idle')
@@ -18,6 +21,7 @@ const successUrl = ref<string | null>(null)
 
 const nameLower = computed(() => name.value.toLowerCase().trim())
 const isValidName = computed(() => /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(nameLower.value))
+const isEmailValid = computed(() => isValidEmail(email.value))
 
 let checkTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -58,6 +62,10 @@ async function checkName() {
 async function onSubmit() {
   if (nameStatus.value !== 'available') return
   if (!spaceId.value.trim()) return
+  if (!isEmailValid.value) {
+    submitError.value = t('emailInvalid')
+    return
+  }
 
   submitting.value = true
   submitError.value = null
@@ -69,7 +77,8 @@ async function onSubmit() {
       body: JSON.stringify({
         name: nameLower.value,
         spaceId: spaceId.value.trim(),
-        description: description.value.trim()
+        description: description.value.trim(),
+        email: email.value.trim().toLowerCase()
       })
     })
     const data = await res.json() as { success?: boolean; url?: string; error?: string }
@@ -150,12 +159,25 @@ async function onSubmit() {
         />
       </div>
 
+      <div class="field">
+        <label class="label" for="email">{{ t('contactEmail') }}</label>
+        <input
+          id="email"
+          v-model="email"
+          class="inputSolo"
+          type="email"
+          autocomplete="email"
+          placeholder="you@example.com"
+        />
+        <div class="hint">{{ t('contactEmailHint') }}</div>
+      </div>
+
       <div v-if="submitError" class="submitError">{{ t('registerError') }}: {{ submitError }}</div>
 
       <button
         class="submitBtn"
         type="button"
-        :disabled="nameStatus !== 'available' || !spaceId.trim() || submitting"
+        :disabled="nameStatus !== 'available' || !spaceId.trim() || !isEmailValid || submitting"
         @click="onSubmit"
       >
         {{ submitting ? t('loading') : t('registerBtn') }}
@@ -204,6 +226,19 @@ async function onSubmit() {
   display: flex;
   align-items: center;
   gap: 0;
+}
+
+/* Standalone input (no domain suffix) — full radius, unlike .input in .inputRow. */
+.inputSolo {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--mv-border-md);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
 }
 
 .input {

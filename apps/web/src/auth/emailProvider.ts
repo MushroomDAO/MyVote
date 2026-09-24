@@ -1,3 +1,4 @@
+import { isValidEmail } from '../lib/email'
 import type { AuthProvider, AuthUser } from './types'
 
 /**
@@ -15,8 +16,6 @@ import type { AuthProvider, AuthUser } from './types'
  */
 
 export const EMAIL_SESSION_KEY = 'myvote.email.session'
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /** No email was supplied and no session is stored. */
 export class EmailRequiredError extends Error {
@@ -66,7 +65,7 @@ export function createEmailProvider(options: EmailProviderOptions = {}): AuthPro
         typeof parsed === 'object' && parsed !== null
           ? (parsed as { email?: unknown }).email
           : undefined
-      if (typeof email !== 'string' || !EMAIL_PATTERN.test(email)) return null
+      if (typeof email !== 'string' || !isValidEmail(email)) return null
       return { displayName: email }
     } catch {
       // Corrupt entry — drop it rather than wedging sign-in forever.
@@ -82,7 +81,7 @@ export function createEmailProvider(options: EmailProviderOptions = {}): AuthPro
     async connect(params) {
       const email = params?.email?.trim().toLowerCase() ?? ''
       if (email) {
-        if (!EMAIL_PATTERN.test(email)) throw new EmailInvalidError()
+        if (!isValidEmail(email)) throw new EmailInvalidError()
         store?.setItem(EMAIL_SESSION_KEY, JSON.stringify({ email }))
         return { displayName: email }
       }
