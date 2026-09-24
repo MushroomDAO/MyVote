@@ -16,14 +16,16 @@ import { useAuth } from '../auth/useAuth'
 
 const { t } = useI18n()
 const router = useRouter()
-const auth = useAuth()
+// Destructured to top-level bindings so the template auto-unwraps the refs:
+// `auth.error` in a `v-if` would test the Ref object itself (always truthy).
+const { error, completeSsoLogin, startLogin } = useAuth()
 
 const failed = ref(false)
 const retrying = ref(false)
 
 onMounted(async () => {
   try {
-    const returnTo = await auth.completeSsoLogin()
+    const returnTo = await completeSsoLogin()
     // replace(), not push() — the callback URL must not sit in the back stack.
     await router.replace(returnTo)
   } catch {
@@ -36,7 +38,7 @@ async function onRetry() {
   retrying.value = true
   try {
     // Navigates away to cos72.
-    await auth.startLogin()
+    await startLogin()
   } finally {
     retrying.value = false
   }
@@ -52,7 +54,7 @@ async function onRetry() {
 
       <template v-else>
         <div class="title">{{ t('ssoFailed') }}</div>
-        <div v-if="auth.error" class="error">{{ auth.error }}</div>
+        <div v-if="error" class="error">{{ error }}</div>
         <button class="button" type="button" :disabled="retrying" @click="onRetry">
           {{ retrying ? t('loading') : t('ssoRetry') }}
         </button>
