@@ -184,14 +184,19 @@ describe('castVote', () => {
       })
     )
 
-    await expect(
-      castVote({
-        hubUrl: 'https://testnet.hub.snapshot.org',
-        vote: { ...baseVote(), type: 'single-choice', choice: 1 },
-        signTypedData: vi.fn().mockResolvedValue('0xsig'),
-        fetchImpl: fetchImpl as unknown as typeof fetch
-      })
-    ).rejects.toThrow(/no voting power/)
+    const promise = castVote({
+      hubUrl: 'https://testnet.hub.snapshot.org',
+      vote: { ...baseVote(), type: 'single-choice', choice: 1 },
+      signTypedData: vi.fn().mockResolvedValue('0xsig'),
+      fetchImpl: fetchImpl as unknown as typeof fetch
+    })
+
+    await expect(promise).rejects.toThrow(/no voting power/)
+    // Coded so the UI can translate it; the raw detail rides along as a param.
+    await expect(promise).rejects.toMatchObject({
+      code: 'voteRejected',
+      params: { status: 400, detail: 'no voting power' }
+    })
   })
 
   it('explains a timestamp rejection as clock skew, not an opaque hub error', async () => {
@@ -213,6 +218,7 @@ describe('castVote', () => {
     // the user's machine, so the message has to say so.
     await expect(promise).rejects.toThrow(/系统时间/)
     await expect(promise).rejects.toThrow(/invalid timestamp/)
+    await expect(promise).rejects.toMatchObject({ code: 'voteClockSkew' })
   })
 
   it('does not POST when signing fails', async () => {
