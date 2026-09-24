@@ -5,11 +5,12 @@ import { useRoute } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
-import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME, SNAPSHOT_HUB_URL } from '../config'
+import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME } from '../config'
 import { useAuth } from '../auth/useAuth'
 import { KmsNotConfiguredError } from '../auth/kms'
 import { fetchProposal, type Proposal, type ProposalType } from '../lib/graphql'
-import { castVote, type VoteChoice } from '../lib/snapshotVote'
+import { type VoteChoice } from '../lib/snapshotVote'
+import { activeVoteBackend } from '../lib/voteBackend'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -108,12 +109,12 @@ async function submitVote() {
     }
 
     // Sign through the active auth provider — wallet or AirAccount/KMS. The page
-    // no longer touches window.ethereum, so the provider abstraction holds.
+    // no longer touches window.ethereum, and submission goes through the active
+    // VoteBackend, so both the auth and protocol seams hold.
     const address = auth.user.value?.address
     if (!address) throw new Error(t('noAccount'))
 
-    const receipt = await castVote({
-      hubUrl: SNAPSHOT_HUB_URL,
+    const receipt = await activeVoteBackend.castVote({
       vote: {
         from: address,
         space: proposal.value.space.id,
