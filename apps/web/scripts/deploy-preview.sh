@@ -36,7 +36,8 @@ else
 fi
 
 SCRATCH="$(mktemp -d)"
-trap 'rm -rf "$SCRATCH"' EXIT
+DEPLOY_LOG="$(mktemp)"
+trap 'rm -rf "$SCRATCH" "$DEPLOY_LOG"' EXIT
 cp wrangler.preview.toml "$SCRATCH/wrangler.toml"
 ln -s "$WEB_DIR/functions" "$SCRATCH/functions"
 
@@ -45,4 +46,29 @@ npx -y wrangler@4 pages deploy "$WEB_DIR/dist" \
   --project-name "$PROJECT" \
   --branch "$BRANCH" \
   --commit-dirty=true \
-  --cwd "$SCRATCH"
+  --cwd "$SCRATCH" | tee "$DEPLOY_LOG"
+
+# --- post-deploy smoke check -------------------------------------------------
+# A deploy can report success while the branch alias serves a stale or empty
+# project, so fetch the alias and require the app shell. Override the target
+# with CF_PREVIEW_URL.
+PREVIEW_URL="${CF_PREVIEW_URL:-}"
+if [ -z "$PREVIEW_URL" ]; then
+  # When no alias appears in the log (e.g. a wrangler log-format change), the
+  # smoke check warns and skips; the deploy itself already succeeded.
+  PREVIEW_URL="$(grep -oE 'https://[A-Za-z0-9.-]+\.pages\.dev' "$DEPLOY_LOG" | tail -1)" || PREVIEW_URL=""
+fi
+if [ -n "$PREVIEW_URL" ]; then
+  echo "==> smoke check $PREVIEW_URL"
+  if ! body="$(curl -fsS --max-time 20 "$PREVIEW_URL/")"; then
+    echo "error: preview smoke check failed: cannot fetch $PREVIEW_URL" >&2
+    exit 1
+  fi
+  if ! printf '%s' "$body" | grep -q 'id="app"'; then
+    echo "error: preview smoke check failed: app shell marker missing at $PREVIEW_URL" >&2
+    exit 1
+  fi
+  echo "    ok: HTTP 200 + app shell"
+else
+  echo "warning: could not determine the preview URL; skipping smoke check" >&2
+fi
