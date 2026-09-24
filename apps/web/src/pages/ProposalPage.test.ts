@@ -80,7 +80,8 @@ const i18n = createI18n({
       sxUnknownNetwork: 'SX_UNKNOWN_NETWORK',
       noWallet: 'NO_WALLET',
       noAccount: 'NO_ACCOUNT',
-      retry: 'Retry'
+      retry: 'Retry',
+      voteSubmitted: 'VOTE_SUBMITTED'
     }
   }
 })
@@ -148,6 +149,42 @@ async function mountAndVote() {
 afterEach(() => {
   vi.resetAllMocks()
   resetRoute()
+})
+
+describe('ProposalPage off-chain vote', () => {
+  it('submits, shows the receipt, and refreshes the tally', async () => {
+    authState.providerId = 'wallet'
+    authState.user = { address: '0x1111111111111111111111111111111111111111' }
+    fetchProposal
+      .mockResolvedValueOnce({ proposal: proposal() })
+      .mockResolvedValueOnce({ proposal: { ...proposal(), votes: 5 } })
+    castVote.mockResolvedValueOnce({ id: 'vote-1' })
+
+    const wrapper = await mountAndVote()
+
+    expect(castVote).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('VOTE_SUBMITTED')
+    // Initial read + the post-vote refresh.
+    expect(fetchProposal).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('.voteOk').exists()).toBe(true)
+    // The refreshed tally is applied without disturbing the receipt.
+    expect(wrapper.get('.votesCount').text()).toContain('5')
+  })
+
+  it('keeps the receipt when the tally refresh fails', async () => {
+    authState.providerId = 'wallet'
+    authState.user = { address: '0x1111111111111111111111111111111111111111' }
+    fetchProposal
+      .mockResolvedValueOnce({ proposal: proposal() })
+      .mockRejectedValueOnce(new Error('refresh offline'))
+    castVote.mockResolvedValueOnce({ id: 'vote-1' })
+
+    const wrapper = await mountAndVote()
+
+    expect(wrapper.text()).toContain('VOTE_SUBMITTED')
+    // A failed refresh is swallowed rather than rendered as a vote error.
+    expect(wrapper.text()).not.toContain('refresh offline')
+  })
 })
 
 describe('ProposalPage vote errors', () => {
@@ -252,6 +289,8 @@ describe('ProposalPage Snapshot X', () => {
     })
     // The off-chain backend must not be used for an SX space.
     expect(castVote).not.toHaveBeenCalled()
+    // Nor is the off-chain proposal re-read after an on-chain vote.
+    expect(fetchProposal).not.toHaveBeenCalled()
   })
 
   it('disables submit on a closed on-chain proposal', async () => {
