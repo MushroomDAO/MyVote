@@ -33,12 +33,12 @@ export const branding = {
    */
   colors: {
     /** Primary accent: links, active borders, focus rings. */
-    primary: '#646cff',
-    primaryHover: '#535bf2',
+    primary: '#2ebd85',
+    primaryHover: '#24a875',
     /** Error / destructive text. */
-    error: '#b00020',
+    error: '#e05260',
     /** Background highlight for a selected voting choice. */
-    selectedBg: 'rgba(66, 184, 131, 0.08)',
+    selectedBg: 'rgba(46, 189, 133, 0.12)',
   },
 
   /** Optional footer / about links. Leave empty strings to hide. */

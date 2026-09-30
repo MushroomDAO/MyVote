@@ -8,9 +8,13 @@ const { fetchSpaces, fetchSxSpaces } = vi.hoisted(() => ({
 }))
 const { push } = vi.hoisted(() => ({ push: vi.fn() }))
 
-vi.mock('../lib/graphql', () => ({
-  fetchSpaces: (...args: unknown[]) => fetchSpaces(...args)
-}))
+vi.mock('../lib/graphql', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/graphql')>()
+  return {
+    ...actual,
+    fetchSpaces: (...args: unknown[]) => fetchSpaces(...args)
+  }
+})
 
 vi.mock('../lib/sx/api', () => ({
   fetchSxSpaces: (...args: unknown[]) => fetchSxSpaces(...args)

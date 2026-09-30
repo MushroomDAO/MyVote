@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
 import { GRAPHQL_ENDPOINT, SX_API_ENDPOINT } from '../config'
-import { fetchSpaceWithProposals, type ProposalListItem, type Space } from '../lib/graphql'
+import { fetchSpaceWithProposals, formatSpaceNetwork, type ProposalListItem, type Space } from '../lib/graphql'
 import { takePage } from '../lib/pageCursor'
 import { createRequestGuard } from '../lib/requestGuard'
 import { fetchSxProposals, fetchSxSpace, type SxProposal } from '../lib/sx/api'
@@ -207,6 +207,10 @@ onUnmounted(() => {
 
       <div v-if="isSx" class="chips">
         <span class="chip">{{ t('sxOnchain') }}</span>
+        <span v-if="sxMeta?.network" class="chip">{{ sxMeta.network }}</span>
+      </div>
+      <div v-else-if="formatSpaceNetwork(space.network)" class="chips">
+        <span class="chip">{{ formatSpaceNetwork(space.network) }}</span>
       </div>
 
       <div v-if="space.about" class="about">{{ space.about }}</div>
@@ -214,6 +218,9 @@ onUnmounted(() => {
       <div v-if="sxMeta" class="sxMeta">
         {{ t('network') }}: {{ sxMeta.network ?? '—' }} · {{ t('proposals') }}:
         {{ sxMeta.proposalCount }}
+      </div>
+      <div v-else-if="formatSpaceNetwork(space.network)" class="sxMeta">
+        {{ t('network') }}: {{ formatSpaceNetwork(space.network) }}
       </div>
 
       <div class="sectionTitle">{{ t('proposals') }}</div>
@@ -259,78 +266,130 @@ onUnmounted(() => {
 .page {
   max-width: 960px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 32px 20px 64px;
 }
 
 .top {
-  margin-bottom: 12px;
+  margin-bottom: 18px;
 }
 
 .back {
-  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mv-muted);
   text-decoration: none;
   font-weight: 600;
+  font-size: 0.92rem;
+  padding: 6px 14px;
+  border-radius: var(--mv-radius-full);
+  background: var(--mv-surface);
+  border: 1px solid var(--mv-card-border);
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.back:hover {
+  color: var(--mv-primary);
+  border-color: var(--mv-card-border-hover);
+  background: var(--mv-surface-hover);
+  transform: translateX(-2px);
 }
 
 .card {
-  border: 1px solid var(--mv-border);
-  border-radius: 12px;
-  padding: 16px;
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-lg);
+  padding: 28px;
+  background: var(--mv-card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--mv-shadow-md);
 }
 
 .titleRow {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
+  margin-bottom: 12px;
 }
 
 .title {
   margin: 0;
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--mv-text-heading);
 }
 
 .id {
-  font-size: 12px;
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   color: var(--mv-muted-sm);
+  background: var(--mv-surface);
+  border: 1px solid var(--mv-border);
+  padding: 3px 10px;
+  border-radius: var(--mv-radius-full);
 }
 
 .chips {
-  margin-top: 8px;
+  margin: 10px 0 16px;
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 
 .chip {
-  border: 1px solid var(--mv-border-md);
-  border-radius: 999px;
-  padding: 3px 10px;
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-full);
+  padding: 4px 12px;
   font-size: 12px;
-  color: var(--mv-muted);
+  font-weight: 600;
+  color: var(--mv-primary);
+  background: var(--mv-selected-bg);
 }
 
 .sxMeta {
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 13px;
   color: var(--mv-muted);
 }
 
 .about {
-  margin-top: 8px;
-  color: var(--mv-muted);
-  font-size: 14px;
+  margin: 14px 0 20px;
+  color: var(--mv-text);
+  font-size: 15px;
+  line-height: 1.6;
+  opacity: 0.9;
 }
 
 .sectionTitle {
-  margin-top: 16px;
+  margin-top: 28px;
   font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+  color: var(--mv-text-heading);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sectionTitle::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 16px;
+  border-radius: var(--mv-radius-full);
+  background: var(--mv-primary);
 }
 
 .muted {
-  margin-top: 10px;
+  margin-top: 14px;
   color: var(--mv-muted);
   font-size: 14px;
+}
+
+.listLoading {
+  padding: 16px 0;
 }
 
 .error {
@@ -338,88 +397,141 @@ onUnmounted(() => {
   word-break: break-word;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+  padding: 12px 0;
 }
 
 .filters {
   display: flex;
   gap: 8px;
-  margin: 8px 0 12px;
+  margin: 14px 0 18px;
+  padding: 4px;
+  background: var(--mv-surface);
+  border: 1px solid var(--mv-border);
+  border-radius: var(--mv-radius-full);
+  width: fit-content;
 }
 
 .filterBtn {
-  border: 1px solid var(--mv-border-md);
-  border-radius: 999px;
-  padding: 4px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--mv-radius-full);
+  padding: 6px 16px;
   background: transparent;
-  color: inherit;
+  color: var(--mv-muted);
   cursor: pointer;
   font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: none;
+}
+
+.filterBtn:hover {
+  color: var(--mv-text);
+  background: var(--mv-surface-hover);
 }
 
 .filterBtn.isActive {
-  background: var(--mv-selected-bg);
-  border-color: var(--mv-primary);
-  font-weight: 600;
+  background: var(--mv-card-bg);
+  border-color: var(--mv-card-border);
+  color: var(--mv-primary);
+  font-weight: 700;
+  box-shadow: var(--mv-shadow-sm);
 }
 
 .retryBtn {
   align-self: flex-start;
-  border: 1px solid var(--mv-border-md);
-  border-radius: 8px;
-  padding: 4px 12px;
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-full);
+  padding: 6px 16px;
   background: var(--mv-surface);
   color: inherit;
   cursor: pointer;
   font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.retryBtn:hover {
+  border-color: var(--mv-primary);
+  color: var(--mv-primary);
+  transform: translateY(-1px);
 }
 
 .list {
-  margin: 12px 0 0;
+  margin: 16px 0 0;
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .item {
-  border: 1px solid var(--mv-border-sm);
-  border-radius: 10px;
-  padding: 12px;
+  border: 1px solid var(--mv-border);
+  border-radius: var(--mv-radius);
+  padding: 18px 20px;
+  background: var(--mv-surface);
+  transition: all 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.item:hover {
+  border-color: var(--mv-card-border-hover);
+  background: var(--mv-surface-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--mv-shadow-md), var(--mv-shadow-glow);
 }
 
 .proposalTitle {
-  color: inherit;
+  color: var(--mv-text-heading);
   text-decoration: none;
   font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.4;
+  display: block;
+  transition: color 0.2s ease;
+}
+
+.item:hover .proposalTitle {
+  color: var(--mv-primary);
 }
 
 .meta {
-  margin-top: 6px;
+  margin-top: 8px;
   font-size: 12px;
   color: var(--mv-muted-sm);
   display: flex;
   gap: 8px;
+  align-items: center;
   flex-wrap: wrap;
 }
 
 .more {
-  margin-top: 16px;
+  margin-top: 24px;
   text-align: center;
 }
 
 .moreBtn {
-  border: 1px solid var(--mv-border-md);
-  border-radius: 10px;
-  padding: 8px 20px;
-  background: var(--mv-surface);
-  color: inherit;
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-full);
+  padding: 10px 28px;
+  background: var(--mv-surface-md);
+  color: var(--mv-text-heading);
   cursor: pointer;
   font-weight: 600;
+  font-size: 0.95rem;
+  box-shadow: var(--mv-shadow-sm);
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.moreBtn:hover:not(:disabled) {
+  border-color: var(--mv-primary);
+  color: var(--mv-primary);
+  background: var(--mv-surface-hover);
+  box-shadow: var(--mv-shadow-glow);
+  transform: translateY(-1px);
 }
 
 .moreBtn:disabled {
   cursor: not-allowed;
-  opacity: 0.7;
+  opacity: 0.5;
 }
 </style>

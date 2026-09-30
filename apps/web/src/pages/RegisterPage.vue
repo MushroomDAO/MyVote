@@ -335,50 +335,65 @@ async function onSubmit() {
 
 <style scoped>
 .page {
-  max-width: 600px;
+  max-width: 620px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 36px 20px 64px;
 }
 
 .title {
-  margin: 0 0 16px;
-  font-size: 20px;
-  font-weight: 600;
+  margin: 0 0 20px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--mv-text-heading);
+  background: linear-gradient(135deg, var(--mv-text-heading) 40%, var(--mv-primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .card {
-  border: 1px solid var(--mv-border);
-  border-radius: 12px;
-  padding: 20px;
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-lg);
+  padding: 32px 28px;
+  background: var(--mv-card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--mv-shadow-md);
 }
 
 .desc {
-  margin: 0 0 20px;
+  margin: 0 0 24px;
   color: var(--mv-muted);
-  font-size: 14px;
+  font-size: 15px;
+  line-height: 1.6;
 }
 
 .field {
-  margin-bottom: 18px;
+  margin-bottom: 22px;
 }
 
 .label {
   display: block;
   font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 6px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--mv-text-heading);
+  margin-bottom: 8px;
 }
 
 .inputRow {
   display: flex;
   align-items: center;
   gap: 0;
+  box-shadow: var(--mv-shadow-sm);
+  border-radius: var(--mv-radius);
+  overflow: hidden;
 }
 
 /* Standalone input (no domain suffix) — full radius, unlike .input in .inputRow. */
 .emailRow {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: stretch;
 }
 
@@ -387,44 +402,59 @@ async function onSubmit() {
 }
 
 .codeBtn {
-  border: 1px solid var(--mv-border-md);
-  border-radius: 8px;
-  padding: 0 12px;
-  background: transparent;
-  color: inherit;
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius);
+  padding: 0 16px;
+  background: var(--mv-surface-md);
+  color: var(--mv-text-heading);
   cursor: pointer;
   font-weight: 600;
+  font-size: 13px;
   white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: var(--mv-shadow-sm);
+}
+
+.codeBtn:hover:not(:disabled) {
+  border-color: var(--mv-primary);
+  color: var(--mv-primary);
+  background: var(--mv-surface-hover);
+  box-shadow: var(--mv-shadow-glow);
 }
 
 .codeBtn:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .codeInput {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .inputSolo {
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--mv-border-md);
-  border-radius: 8px;
-  padding: 9px 12px;
-  background: transparent;
-  color: inherit;
+  border-radius: var(--mv-radius);
+  padding: 11px 14px;
+  background: var(--mv-surface);
+  color: var(--mv-text);
   font: inherit;
   font-size: 14px;
+  box-shadow: var(--mv-shadow-sm);
+}
+
+.inputSolo:hover {
+  border-color: var(--mv-card-border-hover);
 }
 
 .input {
   flex: 1;
   border: 1px solid var(--mv-border-md);
-  border-radius: 8px 0 0 8px;
-  padding: 9px 12px;
-  background: transparent;
-  color: inherit;
+  border-radius: var(--mv-radius) 0 0 var(--mv-radius);
+  padding: 11px 14px;
+  background: var(--mv-surface);
+  color: var(--mv-text);
   font: inherit;
   font-size: 14px;
   outline: none;
@@ -436,106 +466,127 @@ async function onSubmit() {
 }
 
 .field > .input {
-  border-radius: 8px;
+  border-radius: var(--mv-radius);
   width: 100%;
   box-sizing: border-box;
+  box-shadow: var(--mv-shadow-sm);
 }
 
 .domain {
   border: 1px solid var(--mv-border-md);
   border-left: none;
-  border-radius: 0 8px 8px 0;
-  padding: 9px 12px;
+  border-radius: 0 var(--mv-radius) var(--mv-radius) 0;
+  padding: 11px 14px;
   font-size: 13px;
-  color: var(--mv-muted);
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--mv-primary);
   white-space: nowrap;
-  background: var(--mv-surface);
+  background: var(--mv-surface-md);
 }
 
 .hint {
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 12px;
   color: var(--mv-muted-sm);
 }
 
 .statusChecking {
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 12px;
   color: var(--mv-muted);
 }
 
 .statusOk {
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 12px;
-  color: #10b981;
+  color: var(--mv-primary);
   font-weight: 600;
 }
 
 .statusErr {
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 12px;
   color: var(--mv-error);
+  font-weight: 500;
 }
 
 .textarea {
   width: 100%;
   border: 1px solid var(--mv-border-md);
-  border-radius: 8px;
-  padding: 9px 12px;
-  background: transparent;
-  color: inherit;
+  border-radius: var(--mv-radius);
+  padding: 11px 14px;
+  background: var(--mv-surface);
+  color: var(--mv-text);
   font: inherit;
   font-size: 14px;
   resize: vertical;
   box-sizing: border-box;
+  box-shadow: var(--mv-shadow-sm);
 }
 
-.textarea:focus {
-  outline: none;
-  border-color: var(--mv-primary);
+.textarea:hover {
+  border-color: var(--mv-card-border-hover);
 }
 
 .ownershipBtn {
-  margin-top: 8px;
-  border: 1px solid var(--mv-border-md);
-  border-radius: 8px;
-  padding: 8px 12px;
-  background: transparent;
-  color: inherit;
+  margin-top: 10px;
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius);
+  padding: 9px 16px;
+  background: var(--mv-surface-md);
+  color: var(--mv-text-heading);
   cursor: pointer;
   font-weight: 600;
+  font-size: 13px;
+  box-shadow: var(--mv-shadow-sm);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ownershipBtn:hover:not(:disabled) {
+  border-color: var(--mv-primary);
+  color: var(--mv-primary);
+  background: var(--mv-surface-hover);
 }
 
 .ownershipBtn:disabled {
   cursor: not-allowed;
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .submitBtn {
   width: 100%;
-  border: none;
-  border-radius: 10px;
-  padding: 12px;
-  background: var(--mv-primary);
-  color: #fff;
+  margin-top: 8px;
+  border: 1px solid var(--mv-primary);
+  border-radius: var(--mv-radius-full);
+  padding: 13px 20px;
+  background: linear-gradient(135deg, var(--mv-primary), var(--mv-primary-hover));
+  color: #ffffff;
   font: inherit;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s;
+  box-shadow: var(--mv-shadow-glow), var(--mv-shadow-sm);
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .submitBtn:hover:not(:disabled) {
-  background: var(--mv-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 0 25px var(--mv-primary), var(--mv-shadow-md);
 }
 
 .submitBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .submitError {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border-radius: var(--mv-radius);
+  background: rgba(224, 82, 96, 0.1);
+  border: 1px solid rgba(224, 82, 96, 0.3);
   font-size: 13px;
   color: var(--mv-error);
   word-break: break-word;
@@ -544,38 +595,53 @@ async function onSubmit() {
 /* Success state */
 .successCard {
   text-align: center;
-  padding: 32px 20px;
+  padding: 44px 28px;
 }
 
 .successIcon {
-  font-size: 40px;
-  color: #10b981;
-  margin-bottom: 12px;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--mv-selected-bg);
+  border: 1px solid var(--mv-card-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: var(--mv-primary);
+  box-shadow: var(--mv-shadow-glow);
 }
 
 .successTitle {
-  font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 8px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--mv-text-heading);
+  margin-bottom: 10px;
 }
 
 .successDesc {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--mv-muted);
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .successLink {
   display: inline-block;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--mv-primary);
   word-break: break-all;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  padding: 6px 14px;
+  background: var(--mv-surface);
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-full);
 }
 
 .successNote {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--mv-muted-sm);
 }
 </style>

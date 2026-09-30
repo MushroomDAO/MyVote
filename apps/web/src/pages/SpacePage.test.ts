@@ -13,7 +13,13 @@ const { fetchSpaceWithProposals, fetchSxSpace, fetchSxProposals } = vi.hoisted((
   fetchSxProposals: vi.fn()
 }))
 
-vi.mock('../lib/graphql', () => ({ fetchSpaceWithProposals }))
+vi.mock('../lib/graphql', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/graphql')>()
+  return {
+    ...actual,
+    fetchSpaceWithProposals
+  }
+})
 
 vi.mock('../lib/sx/api', () => ({
   fetchSxSpace: (...args: unknown[]) => fetchSxSpace(...args),

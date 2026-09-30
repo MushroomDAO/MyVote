@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { GRAPHQL_ENDPOINT, SX_API_ENDPOINT } from '../config'
-import { fetchSpaces, type Space } from '../lib/graphql'
+import { fetchSpaces, formatSpaceNetwork, type Space } from '../lib/graphql'
 import { cacheGet, cacheSet, cacheDelete, scopedCacheKey } from '../lib/cache'
 import { takePage } from '../lib/pageCursor'
 import { createRequestGuard } from '../lib/requestGuard'
@@ -219,7 +219,10 @@ onUnmounted(() => {
       <ul v-else class="list">
         <li v-for="space in spaces" :key="space.id" class="item">
           <div class="row">
-            <RouterLink class="name" :to="`/space/${space.id}`">{{ space.name }}</RouterLink>
+            <div class="nameRow">
+              <RouterLink class="name" :to="`/space/${space.id}`">{{ space.name }}</RouterLink>
+              <span v-if="formatSpaceNetwork(space.network)" class="networkBadge">{{ formatSpaceNetwork(space.network) }}</span>
+            </div>
             <RouterLink class="id" :to="`/space/${space.id}`">{{ space.id }}</RouterLink>
           </div>
           <div v-if="space.about" class="about">{{ space.about }}</div>
@@ -247,9 +250,13 @@ onUnmounted(() => {
       <ul v-else class="list">
         <li v-for="sp in sxSpaces" :key="sp.id" class="item">
           <div class="row">
-            <RouterLink class="name" :to="`/space/${sp.id}`">{{ sp.name ?? sp.id }}</RouterLink>
-            <span class="id">{{ sxNetworkLabel(sp.network) ?? '' }}</span>
+            <div class="nameRow">
+              <RouterLink class="name" :to="`/space/${sp.id}`">{{ sp.name ?? sp.id }}</RouterLink>
+              <span v-if="sxNetworkLabel(sp.network)" class="networkBadge sxBadge">{{ sxNetworkLabel(sp.network) }}</span>
+            </div>
+            <span class="id">{{ sp.id }}</span>
           </div>
+          <div v-if="sp.about" class="about">{{ sp.about }}</div>
         </li>
       </ul>
 
@@ -266,181 +273,316 @@ onUnmounted(() => {
 .page {
   max-width: 960px;
   margin: 0 auto;
-  padding: 24px;
-}
-
-.onchainCard {
-  margin-top: 16px;
-}
-
-.sxRow {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.sxInput {
-  flex: 1;
-  border: 1px solid var(--mv-border-md);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-}
-
-.sxBtn {
-  border: 1px solid var(--mv-border-md);
-  border-radius: 8px;
-  padding: 8px 12px;
-  background: var(--mv-surface);
-  color: inherit;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.sxError {
-  margin: -4px 0 12px;
-  color: var(--mv-error);
-  font-size: 13px;
+  padding: 36px 20px 64px;
 }
 
 .titleRow {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .title {
   margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  flex: 1;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--mv-text-heading);
+  background: linear-gradient(135deg, var(--mv-text-heading) 40%, var(--mv-primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .refreshBtn {
-  border: 1px solid var(--mv-border-md);
-  border-radius: 8px;
-  padding: 4px 10px;
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-full);
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--mv-surface);
-  color: inherit;
+  color: var(--mv-text);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: var(--mv-shadow-sm);
+}
+
+.refreshBtn:hover:not(:disabled) {
+  border-color: var(--mv-primary);
+  color: var(--mv-primary);
+  background: var(--mv-surface-hover);
+  transform: rotate(180deg) scale(1.05);
 }
 
 .refreshBtn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
+.sxRow {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+  background: var(--mv-surface);
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-lg);
+  padding: 6px;
+  box-shadow: var(--mv-shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.sxRow:focus-within {
+  border-color: var(--mv-primary);
+  box-shadow: 0 0 0 3px var(--mv-selected-bg), var(--mv-shadow-sm);
+}
+
+.sxInput {
+  flex: 1;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent;
+  padding: 8px 14px;
+  color: var(--mv-text);
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.sxInput::placeholder {
+  color: var(--mv-muted-sm);
+}
+
+.sxBtn {
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius);
+  padding: 8px 18px;
+  background: var(--mv-surface-md);
+  color: var(--mv-text-heading);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sxBtn:hover {
+  border-color: var(--mv-primary);
+  color: var(--mv-primary);
+  background: var(--mv-surface-hover);
+  box-shadow: var(--mv-shadow-glow);
+}
+
+.sxError {
+  margin: -14px 0 20px 8px;
+  color: var(--mv-error);
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .card {
-  border: 1px solid var(--mv-border);
-  border-radius: 12px;
-  padding: 16px;
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-lg);
+  padding: 24px;
+  background: var(--mv-card-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--mv-shadow-md);
+  margin-bottom: 24px;
+  transition: border-color 0.2s ease;
+}
+
+.onchainCard {
+  border-color: rgba(245, 158, 11, 0.2);
 }
 
 .cardHeader {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--mv-border);
 }
 
 .muted {
   color: var(--mv-muted);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .cacheNote {
   font-size: 11px;
-  color: var(--mv-muted-sm);
-  border: 1px solid var(--mv-border-sm);
-  border-radius: 4px;
-  padding: 1px 6px;
+  font-weight: 600;
+  color: var(--mv-primary);
+  background: var(--mv-selected-bg);
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-full);
+  padding: 2px 8px;
 }
 
 .placeholder {
-  margin-top: 10px;
+  padding: 32px 0;
+  text-align: center;
   color: var(--mv-muted);
+  font-size: 0.95rem;
 }
 
 .error {
-  margin-top: 10px;
+  padding: 20px 0;
   color: var(--mv-error);
   word-break: break-word;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.95rem;
 }
 
 .retryBtn {
-  align-self: flex-start;
-  border: 1px solid var(--mv-border-md);
-  border-radius: 8px;
-  padding: 4px 12px;
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-full);
+  padding: 6px 16px;
   background: var(--mv-surface);
   color: inherit;
   cursor: pointer;
   font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.retryBtn:hover {
+  border-color: var(--mv-primary);
+  color: var(--mv-primary);
+  transform: translateY(-1px);
 }
 
 .list {
-  margin: 12px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
 }
 
 .item {
-  border: 1px solid var(--mv-border-sm);
-  border-radius: 10px;
-  padding: 12px;
+  border: 1px solid var(--mv-border);
+  border-radius: var(--mv-radius);
+  padding: 18px;
+  background: var(--mv-surface);
+  transition: all 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.item:hover {
+  border-color: var(--mv-card-border-hover);
+  background: var(--mv-surface-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--mv-shadow-md), var(--mv-shadow-glow);
 }
 
 .row {
   display: flex;
-  gap: 10px;
-  align-items: baseline;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
 
 .name {
   font-weight: 700;
-  color: inherit;
+  font-size: 1.05rem;
+  color: var(--mv-text-heading);
   text-decoration: none;
+  transition: color 0.2s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.networkBadge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--mv-radius-full);
+  background: var(--mv-chip-bg);
+  border: 1px solid var(--mv-chip-border);
+  color: var(--mv-chip-text);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sxBadge {
+  background: var(--mv-selected-bg);
+  border-color: var(--mv-selected-border);
+  color: var(--mv-primary);
+}
+
+.item:hover .name {
+  color: var(--mv-primary);
 }
 
 .id {
   font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   color: var(--mv-muted-sm);
   text-decoration: none;
+  display: inline-block;
 }
 
 .about {
-  margin-top: 6px;
+  margin-top: 10px;
   font-size: 13px;
+  line-height: 1.5;
   color: var(--mv-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .more {
-  margin-top: 16px;
+  margin-top: 24px;
   text-align: center;
 }
 
 .moreBtn {
-  border: 1px solid var(--mv-border-md);
-  border-radius: 10px;
-  padding: 8px 20px;
-  background: var(--mv-surface);
-  color: inherit;
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-full);
+  padding: 10px 28px;
+  background: var(--mv-surface-md);
+  color: var(--mv-text-heading);
   cursor: pointer;
   font-weight: 600;
+  font-size: 0.95rem;
+  box-shadow: var(--mv-shadow-sm);
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.moreBtn:hover:not(:disabled) {
+  border-color: var(--mv-primary);
+  color: var(--mv-primary);
+  background: var(--mv-surface-hover);
+  box-shadow: var(--mv-shadow-glow);
+  transform: translateY(-1px);
 }
 
 .moreBtn:disabled {
   cursor: not-allowed;
-  opacity: 0.7;
+  opacity: 0.5;
 }
 </style>

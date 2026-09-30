@@ -154,6 +154,21 @@ describe('App shell auth controls', () => {
     await wrapper.get('#lang').setValue('en')
     expect(h.setLocale).toHaveBeenCalledWith('en')
   })
+
+  it('switches the locale to Thai through setLocale', async () => {
+    const wrapper = mountApp()
+    await wrapper.get('#lang').setValue('th')
+    expect(h.setLocale).toHaveBeenCalledWith('th')
+  })
+
+  it('toggles theme between light and dark', async () => {
+    const wrapper = mountApp()
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+    await wrapper.get('.themeToggleBtn').trigger('click')
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+    await wrapper.get('.themeToggleBtn').trigger('click')
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+  })
 })
 
 describe('App shell error banner', () => {

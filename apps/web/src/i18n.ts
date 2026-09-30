@@ -2,9 +2,9 @@ import { createI18n } from 'vue-i18n'
 
 const LOCALE_STORAGE_KEY = 'locale'
 
-export type AppLocale = 'zh-CN' | 'en'
+export type AppLocale = 'zh-CN' | 'en' | 'th'
 
-/** Exported so the i18n coverage test can assert both catalogs are complete. */
+/** Exported so the i18n coverage test can assert all catalogs are complete. */
 export const messages: Record<AppLocale, Record<string, string>> = {
   'zh-CN': {
     appTitle: 'MyVote',
@@ -212,14 +212,117 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     openSxButton: 'Open',
     openSxInvalid: 'Enter a valid Snapshot X space address (0x + 40 hex characters)',
     onchainSpaces: 'On-chain spaces (Snapshot X)'
+  },
+  th: {
+    appTitle: 'MyVote',
+    explore: 'สำรวจ',
+    language: 'ภาษา',
+    login: 'เข้าสู่ระบบ',
+    logout: 'ออกจากระบบ',
+    loginProvider: 'ผู้ให้บริการ',
+    space: 'ชุมชน',
+    network: 'เครือข่าย',
+    proposal: 'ข้อเสนอ',
+    proposals: 'รายการข้อเสนอ',
+    back: 'ย้อนกลับ',
+    author: 'ผู้สร้าง',
+    state: 'สถานะ',
+    start: 'เวลาเริ่มต้น',
+    end: 'เวลาสิ้นสุด',
+    vote: 'ลงคะแนน',
+    submitVote: 'ส่งคะแนนเสียง',
+    voteChoice: 'เลือกตัวเลือก',
+    voteSubmitted: 'ส่งคะแนนเสียงเรียบร้อยแล้ว',
+    sxAlreadyVoted: 'คุณได้ลงคะแนนบนเชนสำหรับข้อเสนอนี้แล้ว ไม่สามารถลงคะแนนซ้ำหรือแก้ไขได้',
+    sxViewTx: 'ดูธุรกรรม',
+    sxVotePower: 'สิทธิการโหวต',
+    sxYourChoice: 'ตัวเลือกของคุณ',
+    offchainAlreadyVoted: 'คุณได้ลงคะแนนสำหรับข้อเสนอนี้แล้ว สามารถลงคะแนนใหม่เพื่อเปลี่ยนตัวเลือกได้',
+    voteError: 'การลงคะแนนล้มเหลว',
+    noAccount: 'ไม่พบที่อยู่บัญชี กรุณาเข้าสู่ระบบก่อน',
+    kmsPending: 'บริการลงนามระยะไกล AirAccount (KMS) ยังไม่เปิดให้บริการ (E-5)',
+    emailLogin: 'อีเมล',
+    emailPlaceholder: 'you@example.com',
+    emailRequired: 'กรุณากรอกที่อยู่อีเมล',
+    emailInvalid: 'รูปแบบอีเมลไม่ถูกต้อง',
+    emailSigningUnsupported: 'การเข้าสู่ระบบด้วยอีเมลยังไม่รองรับการลงนาม กรุณาใช้วอลเล็ตหรือรอ AirAccount',
+    sxUnknownNetwork: 'ไม่รู้จักเครือข่าย Snapshot X',
+    noWallet: 'ไม่พบวอลเล็ตในเบราว์เซอร์',
+    sxOnchain: 'บนเชน (Snapshot X)',
+    errVoteClockSkew: 'การประทับเวลาลายเซ็นอยู่นอกช่วงที่อนุญาต ({detail}) มักเกิดจากนาฬิกาของระบบไม่ตรง กรุณาปรับเทียบแล้วลองใหม่',
+    errVoteRejected: 'Snapshot hub ปฏิเสธการลงคะแนน ({status}): {detail}',
+    errSsoNotConfigured: 'บริการเข้าสู่ระบบ AirAccount ยังไม่ได้กำหนดค่า กรุณาลองใหม่ภายหลัง',
+    errSsoExchangeFailed: 'เข้าสู่ระบบล้มเหลวขณะแลกเปลี่ยนรหัส กรุณาลองใหม่อีกครั้ง',
+    errSsoCodeRejected: 'รหัสเข้าสู่ระบบหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
+    errSsoVerifyFailed: 'การยืนยันการเข้าสู่ระบบล้มเหลว กรุณาลองใหม่อีกครั้ง',
+    errSsoNoSession: 'ไม่พบเซสชันการเข้าสู่ระบบ กรุณาเข้าสู่ระบบก่อน',
+    errSsoSessionExpired: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่',
+    errAccountMismatch: 'ที่อยู่ผู้ลงนามไม่ตรงกับบัญชีที่เข้าสู่ระบบ',
+    errWalletSwitchBlocked: 'ไม่สามารถเปลี่ยนเป็นวอลเล็ตในโหมดเข้าสู่ระบบ AirAccount ได้',
+    errSxVoteClosed: 'การลงคะแนนข้อเสนอบนเชนนี้ปิดแล้ว',
+    errSxVoteNotStarted: 'การลงคะแนนข้อเสนอบนเชนนี้ยังไม่เริ่มต้น',
+    errSxNoAuthenticator: 'พื้นที่บนเชนนี้ไม่มีตัวตรวจสอบลายเซ็นที่ใช้งานได้',
+    ssoCompleting: 'กำลังดำเนินการเข้าสู่ระบบ…',
+    ssoFailed: 'เข้าสู่ระบบล้มเหลว',
+    ssoRetry: 'เข้าสู่ระบบอีกครั้ง',
+    reasonOptional: 'เหตุผล (ไม่บังคับ)',
+    loading: 'กำลังโหลด…',
+    error: 'เกิดข้อผิดพลาด',
+    spaces: 'ชุมชน (Spaces)',
+    empty: 'ไม่มีข้อมูล',
+    emptyFiltered: 'ไม่มีข้อเสนอในสถานะนี้',
+    loadMore: 'โหลดเพิ่มเติม',
+    results: 'ผลการลงคะแนน',
+    votes: 'คะแนน',
+    register: 'ลงทะเบียนชุมชน',
+    registerDesc: 'ลงทะเบียนโดเมนย่อยสำหรับการกำกับดูแลชุมชนของคุณ',
+    communityName: 'ชื่อชุมชน',
+    communityNameHint: '3–30 ตัวอักษร ใช้ได้เฉพาะตัวอักษรพิมพ์เล็ก ตัวเลข และยัติภังค์',
+    snapshotSpaceId: 'Snapshot Space ID',
+    snapshotSpaceHint: 'เช่น ens.eth (สร้างพื้นที่ของคุณบน snapshot.org ก่อน)',
+    communityDesc: 'คำอธิบายชุมชน (ไม่บังคับ)',
+    contactEmail: 'อีเมลติดต่อ',
+    contactEmailHint: 'สำหรับแจ้งเตือนการลงทะเบียนและการกำกับดูแล จะไม่แสดงต่อสาธารณะ',
+    sendCode: 'ขอรับรหัสยืนยัน',
+    emailCodePlaceholder: 'รหัส 6 หลัก',
+    emailCodeSent: 'ส่งรหัสยืนยันแล้ว กรุณาตรวจสอบกล่องจดหมาย (และเมลขยะ)',
+    emailCodeRequired: 'กรุณากรอกรหัสยืนยันจากอีเมล',
+    emailCodeInvalid: 'รหัสยืนยันไม่ถูกต้องหรือหมดอายุ',
+    emailCodeUnavailable: 'สภาพแวดล้อมนี้ไม่ได้เปิดใช้การยืนยันอีเมล สามารถลงทะเบียนได้ทันที',
+    emailCodeSendFailed: 'ส่งรหัสยืนยันไม่สำเร็จ กรุณาลองใหม่ภายหลัง',
+    ownershipTitle: 'การยืนยันความเป็นเจ้าของ Space (ไม่บังคับ)',
+    ownershipHint: 'ลงนามด้วยวอลเล็ตผู้ดูแล Space เพื่อพิสูจน์ความเป็นเจ้าของ สามารถลงทะเบียนโดยไม่ยืนยันได้ (จะบันทึกเป็นยังไม่ยืนยัน)',
+    ownershipVerify: 'เชื่อมต่อวอลเล็ตและลงนาม',
+    ownershipSigning: 'กำลังรอลายเซ็น…',
+    ownershipVerified: 'ยืนยันความเป็นเจ้าของแล้ว',
+    registerBtn: 'ลงทะเบียนและปรับใช้',
+    checking: 'กำลังตรวจสอบ…',
+    nameAvailable: 'ใช้งานได้',
+    nameTaken: 'มีผู้ใช้งานแล้ว',
+    nameInvalid: 'รูปแบบไม่ถูกต้อง',
+    registerSuccess: 'ลงทะเบียนสำเร็จ!',
+    registerSuccessDesc: 'หน้าการกำกับดูแลชุมชนของคุณพร้อมใช้งานที่:',
+    registerSuccessNote: 'DNS อาจใช้เวลา 1–2 นาทีในการแพร่กระจาย โปรดรีเฟรชในภายหลัง',
+    registerError: 'ลงทะเบียนไม่สำเร็จ',
+    refresh: 'รีเฟรช',
+    retry: 'ลองใหม่อีกครั้ง',
+    filterAll: 'ทั้งหมด',
+    filterActive: 'กำลังดำเนินการ',
+    filterClosed: 'สิ้นสุดแล้ว',
+    cached: 'แคช',
+    openSxPlaceholder: 'เปิดพื้นที่บนเชน: วางที่อยู่ Snapshot X (0x…)',
+    openSxButton: 'เปิด',
+    openSxInvalid: 'กรุณาระบุที่อยู่ Snapshot X ที่ถูกต้อง (0x ตามด้วยเลขฐานสิบหก 40 หลัก)',
+    onchainSpaces: 'พื้นที่บนเชน (Snapshot X)'
   }
 }
 
 function normalizeLocale(input: string | null | undefined): AppLocale | null {
   if (!input) return null
-  if (input === 'zh-CN' || input === 'en') return input
+  if (input === 'zh-CN' || input === 'en' || input === 'th') return input
   if (input.startsWith('zh')) return 'zh-CN'
   if (input.startsWith('en')) return 'en'
+  if (input.startsWith('th')) return 'th'
   return null
 }
 

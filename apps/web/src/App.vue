@@ -36,7 +36,35 @@ const errorText = computed(() => {
   return key ? t(key) : (error.value ?? '')
 })
 
+type AppTheme = 'light' | 'dark'
+const THEME_STORAGE_KEY = 'myvote_theme'
+
+function getInitialTheme(): AppTheme {
+  if (typeof localStorage !== 'undefined') {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY)
+    if (stored === 'light' || stored === 'dark') return stored
+  }
+  return 'light'
+}
+
+const theme = ref<AppTheme>(getInitialTheme())
+
+function applyTheme(val: AppTheme) {
+  theme.value = val
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-theme', val)
+  }
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(THEME_STORAGE_KEY, val)
+  }
+}
+
+function toggleTheme() {
+  applyTheme(theme.value === 'light' ? 'dark' : 'light')
+}
+
 onMounted(() => {
+  applyTheme(theme.value)
   // Consumes a `?code=` from cos72, or revalidates a stored token. Silent by design.
   void restoreSession()
 })
@@ -94,7 +122,53 @@ async function onConnectClick() {
         <select id="lang" v-model="selectedLocale" class="select">
           <option value="zh-CN">中文</option>
           <option value="en">English</option>
+          <option value="th">ไทย</option>
         </select>
+
+        <button
+          class="themeToggleBtn"
+          type="button"
+          :title="theme === 'light' ? '切换至深色模式' : '切换至明亮模式'"
+          :aria-label="theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'"
+          @click="toggleTheme"
+        >
+          <svg
+            v-if="theme === 'light'"
+            class="themeIcon"
+            viewBox="0 0 24 24"
+            width="17"
+            height="17"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg
+            v-else
+            class="themeIcon"
+            viewBox="0 0 24 24"
+            width="17"
+            height="17"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
 
         <input
           v-if="needsEmail"
@@ -124,80 +198,199 @@ async function onConnectClick() {
 <style scoped>
 .app {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 16px;
+  gap: 20px;
+  padding: 14px 24px;
   border-bottom: 1px solid var(--mv-border);
+  background: var(--mv-card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.15);
+  transition: all 0.25s ease;
 }
 
 .brand {
-  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+  color: var(--mv-text-heading);
+}
+
+.brand::before {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--mv-primary);
+  box-shadow: 0 0 10px var(--mv-primary);
 }
 
 .logo {
-  height: 28px;
+  height: 32px;
   width: auto;
   display: block;
+  border-radius: var(--mv-radius-sm);
 }
 
 .nav {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
   flex: 1;
 }
 
 .link {
-  color: inherit;
+  color: var(--mv-muted);
   text-decoration: none;
   font-weight: 600;
+  font-size: 0.92rem;
+  padding: 6px 14px;
+  border-radius: var(--mv-radius-full);
+  border: 1px solid transparent;
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.link:hover {
+  color: var(--mv-primary);
+  background: var(--mv-surface);
+  border-color: var(--mv-card-border);
+  transform: translateY(-1px);
 }
 
 .link.router-link-active {
-  text-decoration: underline;
+  color: var(--mv-primary);
+  background: var(--mv-selected-bg);
+  border-color: var(--mv-card-border);
+  text-decoration: none;
+  box-shadow: var(--mv-shadow-sm);
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .label {
   font-size: 12px;
-  color: var(--mv-muted);
+  font-weight: 600;
+  color: var(--mv-muted-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .select,
 .input {
   border: 1px solid var(--mv-border-md);
-  border-radius: 8px;
-  padding: 6px 8px;
-  background: transparent;
-  color: inherit;
+  border-radius: var(--mv-radius);
+  padding: 7px 12px;
+  background: var(--mv-surface);
+  color: var(--mv-text);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.select:hover,
+.input:hover {
+  border-color: var(--mv-card-border-hover);
+  background: var(--mv-surface-hover);
+}
+
+.themeToggleBtn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--mv-card-border);
+  background: var(--mv-surface);
+  color: var(--mv-text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--mv-shadow-sm);
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.themeToggleBtn:hover {
+  border-color: var(--mv-primary);
+  color: var(--mv-primary);
+  background: var(--mv-surface-hover);
+  transform: scale(1.08) rotate(12deg);
+  box-shadow: var(--mv-shadow-glow);
+}
+
+.themeIcon {
+  display: block;
 }
 
 .button {
-  border: 1px solid var(--mv-border-md);
-  border-radius: 10px;
-  padding: 6px 10px;
-  background: var(--mv-surface);
-  color: inherit;
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-full);
+  padding: 7px 16px;
+  background: var(--mv-surface-md);
+  color: var(--mv-text-heading);
   cursor: pointer;
   font-weight: 600;
+  font-size: 0.88rem;
+  box-shadow: var(--mv-shadow-sm);
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.button:hover {
+  border-color: var(--mv-primary);
+  color: var(--mv-primary);
+  background: var(--mv-surface-hover);
+  box-shadow: var(--mv-shadow-glow);
+  transform: translateY(-1px);
 }
 
 .address {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-size: 12px;
-  color: var(--mv-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 600;
+  color: var(--mv-primary);
+  background: var(--mv-selected-bg);
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-full);
+  padding: 5px 12px;
+}
+
+.address::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mv-primary);
+  box-shadow: 0 0 6px var(--mv-primary);
 }
 
 .error {
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--mv-border);
+  max-width: 960px;
+  margin: 16px auto 0;
+  padding: 12px 18px;
+  border-radius: var(--mv-radius);
+  border: 1px solid rgba(224, 82, 96, 0.35);
+  background: rgba(224, 82, 96, 0.08);
   color: var(--mv-error);
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 </style>

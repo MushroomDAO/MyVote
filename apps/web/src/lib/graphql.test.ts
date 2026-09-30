@@ -5,6 +5,7 @@ import {
   fetchSpaceWithProposals,
   fetchSpaces,
   fetchVoterVote,
+  formatSpaceNetwork,
   graphqlRequest
 } from './graphql'
 
@@ -146,5 +147,27 @@ describe('query wrappers', () => {
     await expect(
       fetchVoterVote('https://hub.test/graphql', { proposalId: '0xp', voter: '0xabc' })
     ).resolves.toBeNull()
+  })
+})
+
+describe('formatSpaceNetwork', () => {
+  it('formats known chain IDs and network aliases', () => {
+    expect(formatSpaceNetwork('1')).toBe('Ethereum')
+    expect(formatSpaceNetwork('11155111')).toBe('Sepolia')
+    expect(formatSpaceNetwork('10')).toBe('Optimism')
+    expect(formatSpaceNetwork('137')).toBe('Polygon')
+    expect(formatSpaceNetwork('homestead')).toBe('Ethereum')
+    expect(formatSpaceNetwork('sepolia')).toBe('Sepolia')
+  })
+
+  it('formats unknown numeric chain IDs and strings', () => {
+    expect(formatSpaceNetwork('999')).toBe('Chain #999')
+    expect(formatSpaceNetwork('avalanche')).toBe('Avalanche')
+  })
+
+  it('handles null, undefined and blank values', () => {
+    expect(formatSpaceNetwork(null)).toBeNull()
+    expect(formatSpaceNetwork(undefined)).toBeNull()
+    expect(formatSpaceNetwork('  ')).toBeNull()
   })
 })

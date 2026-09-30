@@ -39,6 +39,34 @@ export type Space = {
   symbol?: string
 }
 
+const CHAIN_ID_LABELS: Record<string, string> = {
+  '1': 'Ethereum',
+  '5': 'Goerli',
+  '10': 'Optimism',
+  '56': 'BNB Chain',
+  '100': 'Gnosis',
+  '137': 'Polygon',
+  '8453': 'Base',
+  '42161': 'Arbitrum',
+  '43114': 'Avalanche',
+  '11155111': 'Sepolia'
+}
+
+/**
+ * Maps Snapshot network identifiers (numeric chainId or network string)
+ * to human-readable network names.
+ */
+export function formatSpaceNetwork(network?: string | null): string | null {
+  if (!network) return null
+  const trimmed = network.trim()
+  if (!trimmed) return null
+  if (CHAIN_ID_LABELS[trimmed]) return CHAIN_ID_LABELS[trimmed]
+  if (trimmed.toLowerCase() === 'homestead') return 'Ethereum'
+  if (trimmed.toLowerCase() === 'sepolia') return 'Sepolia'
+  if (/^\d+$/.test(trimmed)) return `Chain #${trimmed}`
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+}
+
 export type ProposalListItem = {
   id: string
   title: string

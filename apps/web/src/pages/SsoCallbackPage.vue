@@ -68,50 +68,102 @@ async function onRetry() {
 .page {
   max-width: 480px;
   margin: 0 auto;
-  padding: 48px 24px;
+  padding: 64px 20px;
 }
 
 .card {
-  border: 1px solid var(--mv-border);
-  border-radius: 12px;
-  padding: 24px;
+  border: 1px solid var(--mv-card-border);
+  border-radius: var(--mv-radius-lg);
+  padding: 32px 28px;
+  background: var(--mv-card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--mv-shadow-md);
   display: grid;
-  gap: 12px;
+  gap: 16px;
   justify-items: start;
 }
 
 .title {
-  font-weight: 700;
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  color: var(--mv-text-heading);
 }
 
 .muted {
   color: var(--mv-muted);
   font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.muted::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mv-primary);
+  box-shadow: 0 0 10px var(--mv-primary);
+  animation: pulse 1.8s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
 }
 
 .error {
   color: var(--mv-error);
   word-break: break-word;
   font-size: 14px;
+  padding: 10px 14px;
+  border-radius: var(--mv-radius);
+  background: rgba(224, 82, 96, 0.1);
+  border: 1px solid rgba(224, 82, 96, 0.3);
 }
 
 .button {
-  border: 1px solid var(--mv-border-md);
-  border-radius: 10px;
-  padding: 8px 12px;
-  background: var(--mv-surface);
-  color: inherit;
+  border: 1px solid var(--mv-primary);
+  border-radius: var(--mv-radius-full);
+  padding: 10px 20px;
+  background: linear-gradient(135deg, var(--mv-primary), var(--mv-primary-hover));
+  color: #ffffff;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: var(--mv-shadow-glow), var(--mv-shadow-sm);
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px var(--mv-primary);
 }
 
 .button:disabled {
   cursor: not-allowed;
-  opacity: 0.7;
+  opacity: 0.5;
+  box-shadow: none;
 }
 
 .link {
   color: var(--mv-muted);
   font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.link:hover {
+  color: var(--mv-primary);
 }
 </style>
