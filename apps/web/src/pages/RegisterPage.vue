@@ -342,12 +342,13 @@ async function onSubmit() {
 
 .title {
   margin: 0 0 20px;
+  display: inline-block;
   font-size: 28px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: var(--mv-text-heading);
-  background: linear-gradient(135deg, var(--mv-text-heading) 40%, var(--mv-primary));
+  background: linear-gradient(120deg, var(--mv-text-heading) 0%, var(--mv-primary) 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
