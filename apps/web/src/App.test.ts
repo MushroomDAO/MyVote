@@ -94,13 +94,15 @@ describe('App shell branding', () => {
     expect(single.text()).not.toContain('REGISTER')
   })
 
-  it('renders the footer tagline, powered-by badge, and github link', () => {
+  it('renders the footer tagline, powered-by badge, github link, and license', () => {
     const wrapper = mountApp()
     expect(wrapper.get('.footerTagline').text()).toBe('FOOTER_TAGLINE')
     expect(wrapper.get('.poweredBy').text()).toContain('Powered by')
     expect(wrapper.get('.poweredBy').text()).toContain('AAStar')
     expect(wrapper.get('.aastarLogo').attributes('src')).toBe('/aastar-logo.png')
     expect(wrapper.get('.githubLink').attributes('href')).toBe('https://github.com/MushroomDAO/MyVote')
+    expect(wrapper.get('.licenseLink').attributes('href')).toBe('https://www.apache.org/licenses/LICENSE-2.0')
+    expect(wrapper.get('.licenseText').text()).toBe('Apache 2.0')
   })
 })
 
