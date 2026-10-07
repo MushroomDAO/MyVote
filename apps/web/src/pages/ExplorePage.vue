@@ -350,8 +350,10 @@ onUnmounted(() => {
 
 .subtitle {
   margin: 6px 0 0;
-  font-size: 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
   color: var(--mv-text-muted);
+  max-width: 720px;
 }
 
 .refreshBtn {
