@@ -25,6 +25,31 @@ A white-label governance portal for any community. **Classic Snapshot (off-chain
 
 ---
 
+## Trust & Technical Foundations / 信任与技术底座
+
+为了让用户与社区管理者清晰了解资金与治理安全，以下是 MyVote 的工作原理与技术底座说明：
+
+### 1. MyVote 的定位是什么？
+- **非官方的开源轻量级集成客户端**：MyVote 不托管任何用户私钥，不拥有资金池，也不改变底层协议的执行逻辑。
+- **双引擎二合一**：将「Snapshot 经典链下验签」与「Snapshot X 纯链上治理」统一合并到同一个轻量 Organic 界面中，并对多链切换与账户抽象（AA）做了交互层优化。代码完全开源透明。
+
+### 2. Snapshot（经典版）存在 IPFS 上，谁负责掏钱 Pin？数据会丢失吗？
+- **数据存储形态**：经典版 Snapshot 不上以太坊主链（因此完全免 Gas 费），所有提案与投票均由用户私钥生成 **EIP-712 密码学签名**，并生成不可篡改的 **IPFS CID 哈希**。
+- **谁在出钱 Pin（固化）？**：由 **Snapshot Labs 官方团队** 及其合作的基础设施提供商（如 Filecoin 基金会、Pinata、4EVERLAND 等）统一承担 Pinning 节点集群费用，保证全球长久可用。
+- **容灾与不可篡改性**：因为每次投票都有确定性的密码学签名与 IPFS CID，即使 Snapshot 官方服务器故障，任何社区或个人也可以自行镜像 Pin 这些 CID，并基于签名数据与当时链上区块高度离线独立验签、计票。
+
+### 3. Snapshot X 的合约是谁写的？可信吗？被审计过吗？
+- **合约开发者**：由 **Snapshot Labs 官方核心团队** 原生开发，旨在提供免信任、免中心化中继器的全链上执行治理。
+- **安全审计**：Snapshot X 核心合约矩阵（EVM 及 Starknet 架构）已经由顶尖安全审计机构（包括 **ABDK Consulting** 与 **Nethermind** 等）完成全套安全审计，代码全部开源经过社区严格检验。
+
+### 4. 我们可以自定义合约吗？
+- **完全支持！** Snapshot X 采用高扩展的「乐高积木」模块化架构：
+  - **投票策略合约（Voting Strategies）**：可自定义编写支持任意规则（如 ERC20 余额、NFT 权重、加权抵押等）的策略合约；
+  - **执行合约（Execution Strategies）**：可自由绑定时间锁（Timelock）或 Zodiac / Gnosis Safe 多签执行模块，提案通过后**由智能合约自动触发链上金库转账或合约升级**；
+  - **验证器合约（Authenticators）**：支持签名、交易自付或 Relayer 代付验证。
+
+---
+
 ## User Lifecycle / 用户全生命周期
 
 ```mermaid
