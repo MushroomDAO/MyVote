@@ -5,6 +5,12 @@ import { useRoute } from 'vue-router'
 
 import { GRAPHQL_ENDPOINT, SX_API_ENDPOINT } from '../config'
 import { fetchSpaceWithProposals, formatSpaceNetwork, type ProposalListItem, type Space } from '../lib/graphql'
+import {
+  currentNetworkId,
+  getCurrentNetwork,
+  getFallbackGraphqlEndpoint,
+  getFallbackSxApiEndpoint
+} from '../lib/networks'
 import { takePage } from '../lib/pageCursor'
 import { createRequestGuard } from '../lib/requestGuard'
 import { fetchSxProposals, fetchSxSpace, type SxProposal } from '../lib/sx/api'
@@ -83,18 +89,47 @@ async function loadSpace(skip: number, keepSpace = false) {
   const sx = protocolForSpaceId(spaceId.value) === 'snapshot-x'
   isSx.value = sx
   const state = stateFilter.value === 'all' ? undefined : stateFilter.value
+function getGraphqlEndpoint(): string {
+  const current = getCurrentNetwork()
+  if (current.id === 'sepolia') return GRAPHQL_ENDPOINT
+  return current.graphqlEndpoint
+}
+
+function getSxEndpoint(): string {
+  const current = getCurrentNetwork()
+  if (current.id === 'sepolia') return SX_API_ENDPOINT
+  return current.sxApiEndpoint
+}
+
   try {
     if (sx) {
       // On-chain space: read from the SX indexer instead of the off-chain Hub.
-      const [sxSpace, page] = await Promise.all([
-        fetchSxSpace(SX_API_ENDPOINT, spaceId.value, { signal }),
-        fetchSxProposals(SX_API_ENDPOINT, spaceId.value, { first: PAGE_SIZE + 1, skip, signal, state })
+      let sxEndpoint = getSxEndpoint()
+      let [sxSpace, page] = await Promise.all([
+        fetchSxSpace(sxEndpoint, spaceId.value, { signal }),
+        fetchSxProposals(sxEndpoint, spaceId.value, { first: PAGE_SIZE + 1, skip, signal, state })
       ])
       if (!guard.isCurrent(token)) return
 
+      if (!sxSpace && skip === 0) {
+        const fallback = getFallbackSxApiEndpoint(sxEndpoint)
+        try {
+          const [fbSpace, fbPage] = await Promise.all([
+            fetchSxSpace(fallback, spaceId.value, { signal }),
+            fetchSxProposals(fallback, spaceId.value, { first: PAGE_SIZE + 1, skip, signal, state })
+          ])
+          if (fbSpace) {
+            sxSpace = fbSpace
+            page = fbPage
+          }
+        } catch {
+          // ignore fallback failure
+        }
+      }
+
       space.value = sxSpace
         ? { id: sxSpace.id, name: sxSpace.name ?? sxSpace.id, about: sxSpace.about ?? undefined }
-        : null
+        : { id: spaceId.value, name: spaceId.value }
       sxMeta.value = sxSpace
         ? { network: sxNetworkLabel(sxSpace.network), proposalCount: sxSpace.proposalCount }
         : null
@@ -104,7 +139,8 @@ async function loadSpace(skip: number, keepSpace = false) {
       return
     }
 
-    const data = await fetchSpaceWithProposals(GRAPHQL_ENDPOINT, {
+    let endpoint = getGraphqlEndpoint()
+    let data = await fetchSpaceWithProposals(endpoint, {
       spaceId: spaceId.value,
       first: PAGE_SIZE + 1,
       skip,
@@ -113,9 +149,28 @@ async function loadSpace(skip: number, keepSpace = false) {
     })
     if (!guard.isCurrent(token)) return
 
+    // Fallback: If space not found on current Hub, try the other Hub!
+    if (!data.space && skip === 0) {
+      const fallbackEndpoint = getFallbackGraphqlEndpoint(endpoint)
+      try {
+        const fallbackData = await fetchSpaceWithProposals(fallbackEndpoint, {
+          spaceId: spaceId.value,
+          first: PAGE_SIZE + 1,
+          skip,
+          signal,
+          state
+        })
+        if (fallbackData.space) {
+          data = fallbackData
+        }
+      } catch {
+        // Fallback failed
+      }
+    }
+
     const { page, hasMore: more } = takePage(data.proposals, PAGE_SIZE)
     if (skip === 0) {
-      space.value = data.space
+      space.value = data.space ?? { id: spaceId.value, name: spaceId.value }
       proposals.value = page
     } else {
       proposals.value = [...proposals.value, ...page]
@@ -125,7 +180,7 @@ async function loadSpace(skip: number, keepSpace = false) {
     if (!guard.isCurrent(token)) return
     error.value = e instanceof Error ? e.message : String(e)
     if (skip === 0) {
-      space.value = null
+      space.value = { id: spaceId.value, name: spaceId.value }
       proposals.value = []
     }
   } finally {
@@ -165,6 +220,10 @@ watch(spaceId, () => {
 watch(stateFilter, () => {
   // Keep the card and its filters mounted; only the list reloads.
   void loadSpace(0, true)
+})
+
+watch(currentNetworkId, () => {
+  void loadSpace(0)
 })
 
 onMounted(() => {

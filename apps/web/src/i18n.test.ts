@@ -17,24 +17,12 @@ describe('getInitialLocale', () => {
     expect(getInitialLocale()).toBe('en')
   })
 
-  it('falls back to the browser language', () => {
-    vi.stubGlobal('navigator', { language: 'en-GB' })
-    expect(getInitialLocale()).toBe('en')
-  })
-
-  it('normalizes any zh variant to zh-CN', () => {
-    vi.stubGlobal('navigator', { language: 'zh-Hant-TW' })
+  it('defaults to zh-CN when no locale is stored', () => {
     expect(getInitialLocale()).toBe('zh-CN')
   })
 
-  it('defaults to zh-CN for an unsupported language', () => {
-    vi.stubGlobal('navigator', { language: 'fr-FR' })
-    expect(getInitialLocale()).toBe('zh-CN')
-  })
-
-  it('ignores a junk stored value', () => {
+  it('ignores a junk stored value and defaults to zh-CN', () => {
     localStorage.setItem('locale', 'klingon')
-    vi.stubGlobal('navigator', { language: 'zh-CN' })
     expect(getInitialLocale()).toBe('zh-CN')
   })
 })

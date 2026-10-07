@@ -4,6 +4,12 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
 import { GRAPHQL_ENDPOINT, SNAPSHOT_APP_NAME, SX_API_ENDPOINT } from '../config'
+import {
+  currentNetworkId,
+  getCurrentNetwork,
+  getFallbackGraphqlEndpoint,
+  getFallbackSxApiEndpoint
+} from '../lib/networks'
 import { useAuth } from '../auth/useAuth'
 import { EmailSigningUnsupportedError } from '../auth/emailProvider'
 import { KmsNotConfiguredError } from '../auth/kms'
@@ -264,15 +270,44 @@ async function castSxVote(address: string, choice: number) {
   )
 }
 
+function getGraphqlEndpoint(): string {
+  const current = getCurrentNetwork()
+  if (current.id === 'sepolia') return GRAPHQL_ENDPOINT
+  return current.graphqlEndpoint
+}
+
+function getSxEndpoint(): string {
+  const current = getCurrentNetwork()
+  if (current.id === 'sepolia') return SX_API_ENDPOINT
+  return current.sxApiEndpoint
+}
+
 /** Reads the proposal for the current route. Touches no UI state itself. */
 async function fetchProposalData(signal: AbortSignal) {
   if (sxSpaceId.value) {
-    const sx = await fetchSxProposal(SX_API_ENDPOINT, `${sxSpaceId.value}/${proposalId.value}`, {
+    let sxEndpoint = getSxEndpoint()
+    let sx = await fetchSxProposal(sxEndpoint, `${sxSpaceId.value}/${proposalId.value}`, {
       signal
     })
+    if (!sx) {
+      const fbSx = getFallbackSxApiEndpoint(sxEndpoint)
+      try {
+        const fbResult = await fetchSxProposal(fbSx, `${sxSpaceId.value}/${proposalId.value}`, { signal })
+        if (fbResult) sx = fbResult
+      } catch {}
+    }
     return { sx, proposal: sx ? sxToProposal(sx) : null }
   }
-  const data = await fetchProposal(GRAPHQL_ENDPOINT, { proposalId: proposalId.value, signal })
+
+  let endpoint = getGraphqlEndpoint()
+  let data = await fetchProposal(endpoint, { proposalId: proposalId.value, signal })
+  if (!data.proposal) {
+    const fbEndpoint = getFallbackGraphqlEndpoint(endpoint)
+    try {
+      const fbData = await fetchProposal(fbEndpoint, { proposalId: proposalId.value, signal })
+      if (fbData.proposal) data = fbData
+    } catch {}
+  }
   return { sx: null, proposal: data.proposal }
 }
 
@@ -285,7 +320,7 @@ async function refreshOffchainProposal() {
   if (!proposalId.value || sxSpaceId.value) return
   const token = guard.next()
   try {
-    const data = await fetchProposal(GRAPHQL_ENDPOINT, {
+    const data = await fetchProposal(getGraphqlEndpoint(), {
       proposalId: proposalId.value,
       signal: guard.signal
     })
@@ -309,7 +344,7 @@ async function loadExistingSxVote() {
   const token = voteGuard.next()
   try {
     const vote = await fetchSxVoterVote(
-      SX_API_ENDPOINT,
+      getSxEndpoint(),
       { spaceId: sxSpaceId.value, proposalId: sx.proposalId, voter: address },
       { signal: voteGuard.signal }
     )
@@ -330,7 +365,7 @@ async function loadExistingOffchainVote() {
   if (isSx.value || !address || !proposalId.value) return
   const token = voteGuard.next()
   try {
-    const vote = await fetchVoterVote(GRAPHQL_ENDPOINT, {
+    const vote = await fetchVoterVote(getGraphqlEndpoint(), {
       proposalId: proposalId.value,
       voter: address,
       signal: voteGuard.signal
@@ -455,6 +490,10 @@ async function submitVote() {
 }
 
 watch(proposalId, () => {
+  void loadProposal()
+})
+
+watch(currentNetworkId, () => {
   void loadProposal()
 })
 

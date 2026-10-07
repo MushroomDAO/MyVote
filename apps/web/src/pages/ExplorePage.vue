@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { GRAPHQL_ENDPOINT, SX_API_ENDPOINT } from '../config'
 import { fetchSpaces, formatSpaceNetwork, type Space } from '../lib/graphql'
 import { cacheGet, cacheSet, cacheDelete, scopedCacheKey } from '../lib/cache'
-import { currentNetworkId, getCurrentNetwork } from '../lib/networks'
+import { currentNetworkId, getCurrentNetwork, matchesNetwork } from '../lib/networks'
 import { takePage } from '../lib/pageCursor'
 import { createRequestGuard } from '../lib/requestGuard'
 import { fetchSxSpaces, type SxSpace } from '../lib/sx/api'
@@ -67,6 +67,28 @@ const error = ref<string | null>(null)
 const hasMore = ref(true)
 const fromCache = ref(false)
 
+const filteredSpaces = computed(() => {
+  const netId = currentNetworkId.value
+  return spaces.value.filter((sp) => {
+    if (!sp.network) return true
+    if (netId === 'sepolia') {
+      return sp.network === '11155111' || sp.network.toLowerCase() === 'sepolia'
+    }
+    return matchesNetwork(sp.network, netId)
+  })
+})
+
+const filteredSxSpaces = computed(() => {
+  const netId = currentNetworkId.value
+  return sxSpaces.value.filter((sp) => {
+    if (!sp.network) return true
+    if (netId === 'sepolia') {
+      return sp.network === 'sepolia' || sp.network === 'optimism'
+    }
+    return matchesNetwork(sp.network, netId)
+  })
+})
+
 async function loadSpaces(skip: number, forceRefresh = false) {
   const key = getCacheKey()
   if (skip === 0) {
@@ -91,8 +113,9 @@ async function loadSpaces(skip: number, forceRefresh = false) {
   const token = guard.next()
   const signal = guard.signal
   try {
-    // One extra row is the lookahead that makes hasMore exact.
-    const data = await fetchSpaces(getGraphqlEndpoint(), { first: PAGE_SIZE + 1, skip, signal })
+    // When filtering by specific mainnet chain, fetch up to 100 to ensure sufficient matching candidates
+    const fetchLimit = currentNetworkId.value === 'sepolia' ? PAGE_SIZE + 1 : 100
+    const data = await fetchSpaces(getGraphqlEndpoint(), { first: fetchLimit, skip, signal })
     if (!guard.isCurrent(token)) return
     const { page, hasMore: more } = takePage(data.spaces, PAGE_SIZE)
     if (skip === 0) {
@@ -211,7 +234,10 @@ onUnmounted(() => {
 <template>
   <main class="page">
     <div class="titleRow">
-      <h1 class="title">{{ t('explore') }}</h1>
+      <div>
+        <h1 class="title">{{ t('explore') }}</h1>
+        <p class="subtitle">{{ t('exploreSubtitle') }}</p>
+      </div>
       <button class="refreshBtn" type="button" :disabled="loading" @click="refresh" :title="t('refresh')">
         ↻
       </button>
@@ -242,9 +268,9 @@ onUnmounted(() => {
         {{ error }}
         <button class="retryBtn" type="button" @click="refresh">{{ t('retry') }}</button>
       </div>
-      <div v-else-if="spaces.length === 0" class="placeholder">{{ t('empty') }}</div>
+      <div v-else-if="filteredSpaces.length === 0" class="placeholder">{{ t('emptyFiltered') }}</div>
       <ul v-else class="list">
-        <li v-for="space in spaces" :key="space.id" class="item">
+        <li v-for="space in filteredSpaces" :key="space.id" class="item">
           <div class="row">
             <div class="nameRow">
               <RouterLink class="name" :to="`/space/${space.id}`">{{ space.name }}</RouterLink>
@@ -273,9 +299,9 @@ onUnmounted(() => {
         {{ t('error') }}
         <button class="retryBtn" type="button" @click="loadSxSpaces(0, true)">{{ t('retry') }}</button>
       </div>
-      <div v-else-if="sxSpaces.length === 0" class="placeholder">{{ t('empty') }}</div>
+      <div v-else-if="filteredSxSpaces.length === 0" class="placeholder">{{ t('emptyFiltered') }}</div>
       <ul v-else class="list">
-        <li v-for="sp in sxSpaces" :key="sp.id" class="item">
+        <li v-for="sp in filteredSxSpaces" :key="sp.id" class="item">
           <div class="row">
             <div class="nameRow">
               <RouterLink class="name" :to="`/space/${sp.id}`">{{ sp.name ?? sp.id }}</RouterLink>
@@ -320,6 +346,12 @@ onUnmounted(() => {
   background: linear-gradient(135deg, var(--mv-text-heading) 40%, var(--mv-primary));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--mv-text-muted);
 }
 
 .refreshBtn {

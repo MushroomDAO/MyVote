@@ -37,4 +37,24 @@ describe('networks module', () => {
     setNetwork('non-existent')
     expect(currentNetworkId.value).toBe('sepolia')
   })
+
+  it('matches networks by chainId, name and alias', async () => {
+    const { matchesNetwork } = await import('./networks')
+    expect(matchesNetwork('42161', 'arbitrum')).toBe(true)
+    expect(matchesNetwork('arb', 'arbitrum')).toBe(true)
+    expect(matchesNetwork('8453', 'base')).toBe(true)
+    expect(matchesNetwork('1', 'mainnet')).toBe(true)
+    expect(matchesNetwork('homestead', 'mainnet')).toBe(true)
+    expect(matchesNetwork('11155111', 'sepolia')).toBe(true)
+    expect(matchesNetwork('1', 'arbitrum')).toBe(false)
+    expect(matchesNetwork('8453', 'all')).toBe(true)
+  })
+
+  it('provides correct fallback endpoints', async () => {
+    const { getFallbackGraphqlEndpoint, getFallbackSxApiEndpoint } = await import('./networks')
+    expect(getFallbackGraphqlEndpoint('https://testnet.hub.snapshot.org/graphql')).toBe('https://hub.snapshot.org/graphql')
+    expect(getFallbackGraphqlEndpoint('https://hub.snapshot.org/graphql')).toBe('https://testnet.hub.snapshot.org/graphql')
+    expect(getFallbackSxApiEndpoint('https://testnet-api.snapshot.box')).toBe('https://api.snapshot.box')
+    expect(getFallbackSxApiEndpoint('https://api.snapshot.box')).toBe('https://testnet-api.snapshot.box')
+  })
 })

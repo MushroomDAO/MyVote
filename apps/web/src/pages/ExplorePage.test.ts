@@ -46,6 +46,7 @@ const i18n = createI18n({
   messages: {
     en: {
       explore: 'Explore',
+      exploreSubtitle: 'Dual mode',
       spaces: 'Spaces',
       loading: 'Loading…',
       empty: 'No data',
@@ -57,6 +58,7 @@ const i18n = createI18n({
       openSxButton: 'Open',
       openSxInvalid: 'INVALID_SX',
       onchainSpaces: 'On-chain spaces',
+      emptyFiltered: 'No spaces in this network',
       error: 'SX_ERROR'
     }
   }

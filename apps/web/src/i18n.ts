@@ -103,6 +103,7 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     filterActive: '进行中',
     filterClosed: '已结束',
     cached: '缓存',
+    exploreSubtitle: '自动支持 Snapshot（链下验签）与 Snapshot X（链上治理）双模式',
     openSxPlaceholder: '打开链上空间：粘贴 Snapshot X 空间地址 (0x…)',
     openSxButton: '打开',
     openSxInvalid: '请输入有效的 Snapshot X 空间地址（0x 开头的 40 位十六进制）',
@@ -209,6 +210,7 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     filterActive: 'Active',
     filterClosed: 'Closed',
     cached: 'cached',
+    exploreSubtitle: 'Seamlessly supports both Snapshot (off-chain) and Snapshot X (on-chain)',
     openSxPlaceholder: 'Open an on-chain space: paste a Snapshot X address (0x…)',
     openSxButton: 'Open',
     openSxInvalid: 'Enter a valid Snapshot X space address (0x + 40 hex characters)',
@@ -312,6 +314,7 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     filterActive: 'กำลังดำเนินการ',
     filterClosed: 'สิ้นสุดแล้ว',
     cached: 'แคช',
+    exploreSubtitle: 'รองรับทั้งโหมด Snapshot (ออฟเชน) และ Snapshot X (ออนเชน) โดยอัตโนมัติ',
     openSxPlaceholder: 'เปิดพื้นที่บนเชน: วางที่อยู่ Snapshot X (0x…)',
     openSxButton: 'เปิด',
     openSxInvalid: 'กรุณาระบุที่อยู่ Snapshot X ที่ถูกต้อง (0x ตามด้วยเลขฐานสิบหก 40 หลัก)',
@@ -332,9 +335,6 @@ function normalizeLocale(input: string | null | undefined): AppLocale | null {
 export function getInitialLocale(): AppLocale {
   const stored = normalizeLocale(localStorage.getItem(LOCALE_STORAGE_KEY))
   if (stored) return stored
-
-  const browser = normalizeLocale(navigator.language)
-  if (browser) return browser
 
   return 'zh-CN'
 }

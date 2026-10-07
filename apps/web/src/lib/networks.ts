@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-export type NetworkId = 'sepolia' | 'mainnet' | 'optimism' | 'arbitrum' | 'base' | 'polygon'
+export type NetworkId = 'all' | 'sepolia' | 'mainnet' | 'optimism' | 'arbitrum' | 'base' | 'polygon'
 
 export type NetworkConfig = {
   id: NetworkId
@@ -13,6 +13,15 @@ export type NetworkConfig = {
 }
 
 export const SUPPORTED_NETWORKS: Record<NetworkId, NetworkConfig> = {
+  all: {
+    id: 'all',
+    name: 'All (Mainnet)',
+    chainId: 0,
+    isTestnet: false,
+    hubUrl: 'https://hub.snapshot.org',
+    graphqlEndpoint: 'https://hub.snapshot.org/graphql',
+    sxApiEndpoint: 'https://api.snapshot.box'
+  },
   sepolia: {
     id: 'sepolia',
     name: 'Sepolia',
@@ -97,3 +106,36 @@ export function setNetwork(id: NetworkId): void {
 export function getCurrentNetwork(): NetworkConfig {
   return SUPPORTED_NETWORKS[currentNetworkId.value] ?? SUPPORTED_NETWORKS.sepolia
 }
+
+export function matchesNetwork(networkVal: string | undefined | null, targetNetworkId: NetworkId): boolean {
+  if (!networkVal) return false
+  const trimmed = networkVal.trim().toLowerCase()
+  const target = SUPPORTED_NETWORKS[targetNetworkId]
+  if (!target) return false
+
+  if (targetNetworkId === 'all') return true
+  if (trimmed === String(target.chainId)) return true
+  if (trimmed === target.id.toLowerCase()) return true
+  if (targetNetworkId === 'mainnet' && (trimmed === '1' || trimmed === 'homestead' || trimmed === 'ethereum')) return true
+  if (targetNetworkId === 'sepolia' && (trimmed === '11155111' || trimmed === 'sepolia')) return true
+  if (targetNetworkId === 'optimism' && (trimmed === '10' || trimmed === 'oeth')) return true
+  if (targetNetworkId === 'arbitrum' && (trimmed === '42161' || trimmed === 'arb' || trimmed === 'arb1')) return true
+  if (targetNetworkId === 'base' && trimmed === '8453') return true
+  if (targetNetworkId === 'polygon' && (trimmed === '137' || trimmed === 'matic')) return true
+  return false
+}
+
+export function getFallbackGraphqlEndpoint(currentEndpoint: string): string {
+  if (currentEndpoint.includes('testnet.hub.snapshot.org')) {
+    return 'https://hub.snapshot.org/graphql'
+  }
+  return 'https://testnet.hub.snapshot.org/graphql'
+}
+
+export function getFallbackSxApiEndpoint(currentEndpoint: string): string {
+  if (currentEndpoint.includes('testnet-api.snapshot.box')) {
+    return 'https://api.snapshot.box'
+  }
+  return 'https://testnet-api.snapshot.box'
+}
+
