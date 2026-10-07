@@ -170,7 +170,12 @@ function getSxEndpoint(): string {
 
     const { page, hasMore: more } = takePage(data.proposals, PAGE_SIZE)
     if (skip === 0) {
-      space.value = data.space ?? { id: spaceId.value, name: spaceId.value }
+      space.value = data.space ?? {
+        id: spaceId.value,
+        name: spaceId.value.toLowerCase() === 'aastar.eth' ? t('demoSpaceName') : spaceId.value,
+        about: spaceId.value.toLowerCase() === 'aastar.eth' ? t('demoSpaceAbout') : undefined,
+        network: spaceId.value.toLowerCase() === 'aastar.eth' ? '11155111' : undefined
+      }
       proposals.value = page
     } else {
       proposals.value = [...proposals.value, ...page]
@@ -180,7 +185,12 @@ function getSxEndpoint(): string {
     if (!guard.isCurrent(token)) return
     error.value = e instanceof Error ? e.message : String(e)
     if (skip === 0) {
-      space.value = { id: spaceId.value, name: spaceId.value }
+      space.value = {
+        id: spaceId.value,
+        name: spaceId.value.toLowerCase() === 'aastar.eth' ? t('demoSpaceName') : spaceId.value,
+        about: spaceId.value.toLowerCase() === 'aastar.eth' ? t('demoSpaceAbout') : undefined,
+        network: spaceId.value.toLowerCase() === 'aastar.eth' ? '11155111' : undefined
+      }
       proposals.value = []
     }
   } finally {

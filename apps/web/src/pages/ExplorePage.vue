@@ -67,15 +67,33 @@ const error = ref<string | null>(null)
 const hasMore = ref(true)
 const fromCache = ref(false)
 
+const DEMO_SPACE_ID = 'aastar.eth'
+
 const filteredSpaces = computed(() => {
   const netId = currentNetworkId.value
-  return spaces.value.filter((sp) => {
+  const list = spaces.value.filter((sp) => {
     if (!sp.network) return true
     if (netId === 'sepolia') {
       return sp.network === '11155111' || sp.network.toLowerCase() === 'sepolia'
     }
     return matchesNetwork(sp.network, netId)
   })
+
+  if (spaces.value.length === 0 && loading.value) {
+    return []
+  }
+
+  const remoteDemo = spaces.value.find((sp) => sp.id.toLowerCase() === DEMO_SPACE_ID)
+  const pinnedDemo: Space = {
+    id: DEMO_SPACE_ID,
+    name: remoteDemo?.name || t('demoSpaceName'),
+    about: remoteDemo?.about || t('demoSpaceAbout'),
+    network: remoteDemo?.network || (netId === 'mainnet' ? '1' : '11155111'),
+    symbol: remoteDemo?.symbol || 'AAStar'
+  }
+
+  const rest = list.filter((sp) => sp.id.toLowerCase() !== DEMO_SPACE_ID)
+  return [pinnedDemo, ...rest]
 })
 
 const filteredSxSpaces = computed(() => {
@@ -270,11 +288,19 @@ onUnmounted(() => {
       </div>
       <div v-else-if="filteredSpaces.length === 0" class="placeholder">{{ t('emptyFiltered') }}</div>
       <ul v-else class="list">
-        <li v-for="space in filteredSpaces" :key="space.id" class="item">
+        <li
+          v-for="space in filteredSpaces"
+          :key="space.id"
+          class="item"
+          :class="{ isPinned: space.id.toLowerCase() === DEMO_SPACE_ID }"
+        >
           <div class="row">
             <div class="nameRow">
               <RouterLink class="name" :to="`/space/${space.id}`">{{ space.name }}</RouterLink>
-              <span v-if="formatSpaceNetwork(space.network)" class="networkBadge">{{ formatSpaceNetwork(space.network) }}</span>
+              <div class="badgeGroup">
+                <span v-if="space.id.toLowerCase() === DEMO_SPACE_ID" class="pinnedBadge">{{ t('pinned') }}</span>
+                <span v-if="formatSpaceNetwork(space.network)" class="networkBadge">{{ formatSpaceNetwork(space.network) }}</span>
+              </div>
             </div>
             <RouterLink class="id" :to="`/space/${space.id}`">{{ space.id }}</RouterLink>
           </div>
@@ -574,6 +600,35 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.item.isPinned {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.04) 0%, var(--mv-surface) 100%);
+}
+
+.item.isPinned:hover {
+  border-color: #22c55e;
+  box-shadow: 0 4px 20px -2px rgba(34, 197, 94, 0.2);
+}
+
+.badgeGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.pinnedBadge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--mv-radius-full);
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #22c55e;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .networkBadge {

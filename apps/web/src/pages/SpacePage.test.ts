@@ -56,7 +56,9 @@ const i18n = createI18n({
       emptyFiltered: 'EMPTY_FILTERED',
       filterAll: 'ALL',
       filterActive: 'ACTIVE',
-      filterClosed: 'CLOSED'
+      filterClosed: 'CLOSED',
+      demoSpaceName: 'AAStar',
+      demoSpaceAbout: 'AAStar Demo Space'
     }
   }
 })

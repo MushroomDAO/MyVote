@@ -59,7 +59,10 @@ const i18n = createI18n({
       openSxInvalid: 'INVALID_SX',
       onchainSpaces: 'On-chain spaces',
       emptyFiltered: 'No spaces in this network',
-      error: 'SX_ERROR'
+      error: 'SX_ERROR',
+      pinned: 'Pinned',
+      demoSpaceName: 'AAStar',
+      demoSpaceAbout: 'AAStar Demo'
     }
   }
 })
@@ -144,7 +147,7 @@ describe('ExplorePage pagination lookahead', () => {
 
     const params = fetchSpaces.mock.calls[0]![1] as { first: number }
     expect(params.first).toBe(31)
-    expect(wrapper.findAll('.item')).toHaveLength(30)
+    expect(wrapper.findAll('.item')).toHaveLength(31)
     expect(wrapper.find('.moreBtn').exists()).toBe(false)
   })
 
@@ -154,8 +157,26 @@ describe('ExplorePage pagination lookahead', () => {
     const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
     await flushPromises()
 
-    expect(wrapper.findAll('.item')).toHaveLength(30)
+    expect(wrapper.findAll('.item')).toHaveLength(31)
     expect(wrapper.find('.moreBtn').exists()).toBe(true)
+  })
+})
+
+describe('ExplorePage pinned demo space', () => {
+  it('pins AAStar demo space at the top of the space list', async () => {
+    fetchSpaces.mockResolvedValueOnce({
+      spaces: [{ id: 'other.eth', name: 'Other DAO' }]
+    })
+    fetchSxSpaces.mockResolvedValue([])
+    const wrapper = mount(ExplorePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+
+    const items = wrapper.findAll('.item')
+    expect(items.length).toBe(2)
+    expect(items[0]!.get('.name').text()).toBe('AAStar')
+    expect(items[0]!.get('.pinnedBadge').text()).toBe('Pinned')
+    expect(items[0]!.get('.id').text()).toBe('aastar.eth')
+    expect(items[1]!.get('.name').text()).toBe('Other DAO')
   })
 })
 

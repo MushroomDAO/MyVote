@@ -109,7 +109,10 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     openSxButton: '打开',
     openSxInvalid: '请输入有效的 Snapshot X 空间地址（0x 开头的 40 位十六进制）',
     onchainSpaces: '链上空间（Snapshot X）',
-    testnet: '测试网'
+    testnet: '测试网',
+    demoSpaceName: 'AAStar',
+    demoSpaceAbout: 'AAStar 治理演示空间 · 记录共识之地',
+    pinned: '置顶'
   },
   en: {
     appTitle: 'MyVote',
@@ -217,7 +220,10 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     openSxButton: 'Open',
     openSxInvalid: 'Enter a valid Snapshot X space address (0x + 40 hex characters)',
     onchainSpaces: 'On-chain spaces (Snapshot X)',
-    testnet: 'Testnet'
+    testnet: 'Testnet',
+    demoSpaceName: 'AAStar',
+    demoSpaceAbout: 'AAStar Governance Demo Space · Where Consensus is Recorded',
+    pinned: 'Pinned'
   },
   th: {
     appTitle: 'MyVote',
@@ -322,7 +328,10 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     openSxButton: 'เปิด',
     openSxInvalid: 'กรุณาระบุที่อยู่ Snapshot X ที่ถูกต้อง (0x ตามด้วยเลขฐานสิบหก 40 หลัก)',
     onchainSpaces: 'พื้นที่บนเชน (Snapshot X)',
-    testnet: 'เครือข่ายทดสอบ'
+    testnet: 'เครือข่ายทดสอบ',
+    demoSpaceName: 'AAStar',
+    demoSpaceAbout: 'พื้นที่สาธิตการกำกับดูแล AAStar · ดินแดนแห่งการบันทึกฉันทามติ',
+    pinned: 'ปักหมุด'
   }
 }
 
