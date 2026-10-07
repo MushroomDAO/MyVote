@@ -45,7 +45,8 @@ const i18n = createI18n({
       logout: 'LOGOUT',
       network: 'Network',
       testnet: 'Testnet',
-      errAccountMismatch: 'ERR_ACCOUNT'
+      errAccountMismatch: 'ERR_ACCOUNT',
+      footerTagline: 'FOOTER_TAGLINE'
     }
   }
 })
@@ -91,6 +92,11 @@ describe('App shell branding', () => {
     h.tenant.spaceId = 'aastar.eth'
     const single = mountApp()
     expect(single.text()).not.toContain('REGISTER')
+  })
+
+  it('renders the footer tagline', () => {
+    const wrapper = mountApp()
+    expect(wrapper.get('.footerTagline').text()).toBe('FOOTER_TAGLINE')
   })
 })
 

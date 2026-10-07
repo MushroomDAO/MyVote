@@ -117,22 +117,31 @@ export function useAuth() {
    * explicit Login click.
    */
   async function restoreSession(): Promise<void> {
-    if (!detectSsoSession()) return
-    activeProviderId.value = 'airaccount'
-    try {
-      user.value = await airAccountBridge.restore()
-    } catch (e) {
-      user.value = null
-      // A dead code (spent/expired/mismatched) is a terminal state the user has
-      // to act on. Say so — swallowing it silently while the wallet entry stays
-      // disabled is exactly the dead end we're avoiding.
-      if (e instanceof SsoCodeRejectedError) {
-        error.value = `${e.message}(请重新登录)`
-        errorCode.value = codeOf(e)
+    if (detectSsoSession()) {
+      activeProviderId.value = 'airaccount'
+      try {
+        user.value = await airAccountBridge.restore()
+      } catch (e) {
+        user.value = null
+        // A dead code (spent/expired/mismatched) is a terminal state the user has
+        // to act on. Say so — swallowing it silently while the wallet entry stays
+        // disabled is exactly the dead end we're avoiding.
+        if (e instanceof SsoCodeRejectedError) {
+          error.value = `${e.message}(请重新登录)`
+          errorCode.value = codeOf(e)
+        }
+        // Anything else (no session yet, network blip) stays quiet: not user-initiated.
+      } finally {
+        ssoSessionActive.value = detectSsoSession()
       }
-      // Anything else (no session yet, network blip) stays quiet: not user-initiated.
-    } finally {
-      ssoSessionActive.value = detectSsoSession()
+      return
+    }
+
+    // Restore interim email session if present
+    const emailUser = providersById.email.getUser()
+    if (emailUser) {
+      activeProviderId.value = 'email'
+      user.value = emailUser
     }
   }
 

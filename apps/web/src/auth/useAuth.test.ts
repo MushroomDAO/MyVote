@@ -44,7 +44,7 @@ const m = vi.hoisted(() => {
     providers: {
       wallet: { id: 'wallet', connect: vi.fn(), disconnect: vi.fn() },
       airaccount: { id: 'airaccount', connect: vi.fn(), disconnect: vi.fn() },
-      email: { id: 'email', connect: vi.fn(), disconnect: vi.fn() }
+      email: { id: 'email', connect: vi.fn(), disconnect: vi.fn(), getUser: vi.fn() }
     }
   }
 })
@@ -241,6 +241,15 @@ describe('useAuth restoreSession', () => {
     await auth.restoreSession()
     expect(auth.error.value).toBeNull()
     expect(auth.user.value).toBeNull()
+  })
+
+  it('restores an email session when present and switches to email', async () => {
+    m.providers.email.getUser.mockReturnValueOnce({ displayName: 'alice@example.com' })
+    const auth = await loadAuth()
+    await auth.restoreSession()
+    expect(auth.user.value).toEqual({ displayName: 'alice@example.com' })
+    expect(auth.activeProviderId.value).toBe('email')
+    expect(auth.error.value).toBeNull()
   })
 })
 

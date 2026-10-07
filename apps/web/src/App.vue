@@ -205,6 +205,10 @@ async function onConnectClick() {
     </div>
 
     <RouterView />
+
+    <footer class="footer">
+      <p class="footerTagline">{{ t('footerTagline') }}</p>
+    </footer>
   </div>
 </template>
 
@@ -405,5 +409,21 @@ async function onConnectClick() {
   color: var(--mv-error);
   font-size: 0.9rem;
   font-weight: 500;
+}
+
+.footer {
+  margin-top: auto;
+  border-top: 1px solid var(--mv-border);
+  padding: 24px 20px;
+  text-align: center;
+  background: var(--mv-surface-card);
+}
+
+.footerTagline {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--mv-text-muted);
 }
 </style>
