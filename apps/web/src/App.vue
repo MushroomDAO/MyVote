@@ -207,7 +207,15 @@ async function onConnectClick() {
     <RouterView />
 
     <footer class="footer">
-      <p class="footerTagline">{{ t('footerTagline') }}</p>
+      <div class="footerContent">
+        <span class="footerTagline">{{ t('footerTagline') }}</span>
+        <span class="footerDivider">·</span>
+        <a href="https://aastar.io" target="_blank" rel="noopener noreferrer" class="poweredBy">
+          <span class="poweredByLabel">Powered by</span>
+          <img src="/aastar-logo.png" alt="AAStar" class="aastarLogo" />
+          <span class="aastarText">AAStar</span>
+        </a>
+      </div>
     </footer>
   </div>
 </template>
@@ -415,15 +423,57 @@ async function onConnectClick() {
   margin-top: auto;
   border-top: 1px solid var(--mv-border);
   padding: 24px 20px;
-  text-align: center;
   background: var(--mv-surface-card);
 }
 
-.footerTagline {
-  margin: 0;
+.footerContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
   font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   color: var(--mv-text-muted);
+}
+
+.footerTagline {
+  color: var(--mv-text-muted);
+}
+
+.footerDivider {
+  color: var(--mv-card-border);
+  font-weight: 600;
+}
+
+.poweredBy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  text-decoration: none;
+  color: var(--mv-text);
+  font-weight: 600;
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.poweredBy:hover {
+  color: var(--mv-primary);
+}
+
+.poweredByLabel {
+  color: var(--mv-text-muted);
+  font-weight: 400;
+}
+
+.aastarLogo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+.aastarText {
+  letter-spacing: -0.01em;
 }
 </style>
