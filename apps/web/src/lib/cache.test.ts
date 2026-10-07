@@ -14,6 +14,12 @@ describe('scopedCacheKey', () => {
   it('does not let two scopes collide', () => {
     expect(scopedCacheKey('k', 'a.example')).not.toBe(scopedCacheKey('k', 'b.example'))
   })
+
+  it('namespaces the key by network when provided', () => {
+    expect(scopedCacheKey('explore:spaces', 'a.example', 'sepolia')).toBe('explore:spaces:a.example:sepolia')
+    expect(scopedCacheKey('explore:spaces', '', 'mainnet')).toBe('explore:spaces:default:mainnet')
+    expect(scopedCacheKey('k', 'a.example', 'sepolia')).not.toBe(scopedCacheKey('k', 'a.example', 'mainnet'))
+  })
 })
 
 describe('cache store', () => {

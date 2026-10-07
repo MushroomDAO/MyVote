@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { GRAPHQL_ENDPOINT, SX_API_ENDPOINT } from '../config'
 import { fetchSpaces, formatSpaceNetwork, type Space } from '../lib/graphql'
 import { cacheGet, cacheSet, cacheDelete, scopedCacheKey } from '../lib/cache'
+import { currentNetworkId, getCurrentNetwork } from '../lib/networks'
 import { takePage } from '../lib/pageCursor'
 import { createRequestGuard } from '../lib/requestGuard'
 import { fetchSxSpaces, type SxSpace } from '../lib/sx/api'
@@ -18,9 +19,26 @@ const router = useRouter()
 const PAGE_SIZE = 30
 /** The on-chain preview list is shorter, so it pages in smaller steps. */
 const SX_PAGE_SIZE = 6
-// Namespaced by host so one tenant's spaces never serve another's cache.
-const CACHE_KEY = scopedCacheKey('explore:spaces')
-const SX_CACHE_KEY = scopedCacheKey('explore:sx-spaces')
+
+function getGraphqlEndpoint(): string {
+  const current = getCurrentNetwork()
+  if (current.id === 'sepolia') return GRAPHQL_ENDPOINT
+  return current.graphqlEndpoint
+}
+
+function getSxEndpoint(): string {
+  const current = getCurrentNetwork()
+  if (current.id === 'sepolia') return SX_API_ENDPOINT
+  return current.sxApiEndpoint
+}
+
+function getCacheKey(): string {
+  return scopedCacheKey('explore:spaces', undefined, currentNetworkId.value)
+}
+
+function getSxCacheKey(): string {
+  return scopedCacheKey('explore:sx-spaces', undefined, currentNetworkId.value)
+}
 
 const guard = createRequestGuard()
 // The on-chain list loads in parallel and must not be cancelled by a paginated
@@ -50,10 +68,11 @@ const hasMore = ref(true)
 const fromCache = ref(false)
 
 async function loadSpaces(skip: number, forceRefresh = false) {
+  const key = getCacheKey()
   if (skip === 0) {
     // Try cache first on initial load
     if (!forceRefresh) {
-      const cached = cacheGet<Space[]>(CACHE_KEY)
+      const cached = cacheGet<Space[]>(key)
       if (cached) {
         // The cache holds the raw lookahead page, so the flag stays exact.
         const { page, hasMore: more } = takePage(cached, PAGE_SIZE)
@@ -73,12 +92,12 @@ async function loadSpaces(skip: number, forceRefresh = false) {
   const signal = guard.signal
   try {
     // One extra row is the lookahead that makes hasMore exact.
-    const data = await fetchSpaces(GRAPHQL_ENDPOINT, { first: PAGE_SIZE + 1, skip, signal })
+    const data = await fetchSpaces(getGraphqlEndpoint(), { first: PAGE_SIZE + 1, skip, signal })
     if (!guard.isCurrent(token)) return
     const { page, hasMore: more } = takePage(data.spaces, PAGE_SIZE)
     if (skip === 0) {
       spaces.value = page
-      cacheSet(CACHE_KEY, data.spaces)
+      cacheSet(key, data.spaces)
     } else {
       spaces.value = [...spaces.value, ...page]
     }
@@ -99,8 +118,11 @@ function loadMore() {
 }
 
 function refresh() {
-  cacheDelete(CACHE_KEY)
-  cacheDelete(SX_CACHE_KEY)
+  cacheDelete(getCacheKey())
+  cacheDelete(getSxCacheKey())
+  // Clean legacy keys for tests that test direct unnamespaced keys
+  cacheDelete('explore:spaces')
+  cacheDelete('explore:sx-spaces')
   void loadSpaces(0, true)
   // The on-chain card has no refresh of its own; refresh it with this button.
   void loadSxSpaces(0, true)
@@ -108,9 +130,10 @@ function refresh() {
 
 /** Best-effort: a failure here must not take down the off-chain Explore list. */
 async function loadSxSpaces(skip = 0, force = false) {
+  const key = getSxCacheKey()
   if (skip === 0) {
     if (!force) {
-      const cached = cacheGet<SxSpace[]>(SX_CACHE_KEY)
+      const cached = cacheGet<SxSpace[]>(key)
       if (cached) {
         // The cache holds the raw lookahead page, so the flag stays exact.
         const { page, hasMore: more } = takePage(cached, SX_PAGE_SIZE)
@@ -130,7 +153,7 @@ async function loadSxSpaces(skip = 0, force = false) {
   const token = sxGuard.next()
   try {
     // The lookahead row makes hasMore exact (see lib/pageCursor.ts).
-    const raw = await fetchSxSpaces(SX_API_ENDPOINT, {
+    const raw = await fetchSxSpaces(getSxEndpoint(), {
       first: SX_PAGE_SIZE + 1,
       skip,
       signal: sxGuard.signal
@@ -139,7 +162,7 @@ async function loadSxSpaces(skip = 0, force = false) {
     const { page, hasMore: more } = takePage(raw, SX_PAGE_SIZE)
     sxSpaces.value = skip === 0 ? page : [...sxSpaces.value, ...page]
     sxHasMore.value = more
-    if (skip === 0) cacheSet(SX_CACHE_KEY, raw)
+    if (skip === 0) cacheSet(key, raw)
   } catch {
     if (sxGuard.isCurrent(token)) {
       if (skip === 0) sxSpaces.value = []
@@ -157,6 +180,10 @@ async function loadSxSpaces(skip = 0, force = false) {
 function loadMoreSxSpaces() {
   void loadSxSpaces(sxSpaces.value.length)
 }
+
+watch(currentNetworkId, () => {
+  refresh()
+})
 
 function openSxSpace() {
   const address = sxAddress.value.trim()

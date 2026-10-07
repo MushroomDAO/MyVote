@@ -214,9 +214,22 @@
 - [x] SX 已投票提示显示所投选项（`choice` → `choices[choice-1]`）（#62）；
       投票窗口到点自动翻转提交按钮（`lib/sx/voteWindow.ts` 定时器）（#65）。
 - [x] Explore 链上空间列表 5 分钟缓存（与链下一致，refresh/retry 强制绕过）（#64）。
-- [x] i18n catalog 键集完全一致校验 + 筛选空结果专门文案（#66）。
-- [x] SpacePage 切筛选只重载列表，卡片与筛选按钮不闪没（#67）。
-- [ ] 真实 SX 投票 E2E 与注册鉴权仍按 M5 / M6 的阻塞项处理。
+### M7 — 多网络动态切换、分链缓存与定时刷新（规划中）
+
+**目标**：支持在界面自主切换目标网络（Sepolia 测试网 / Ethereum 主网 / Optimism / Arbitrum / Base / Polygon），按所选网络动态路由 Hub / SX 端点，隔离本地缓存并支持定期与手动刷新。
+
+- [ ] **M7-1 网络配置与端点映射抽象**：
+  - 定义统一网络元数据（`id, chainId, name, isTestnet, hubUrl, sxApiUrl`）。
+  - 支持主流网络：`Sepolia (11155111)`, `Ethereum (1)`, `Optimism (10)`, `Arbitrum (42161)`, `Base (8453)`, `Polygon (137)`。
+- [ ] **M7-2 响应式网络状态与分链缓存**：
+  - 响应式网络状态管理，记忆至 `localStorage`（`mv:active-network`）。
+  - 扩展 `scopedCacheKey` 增加网络命名空间（`host:network:key`），彻底杜绝跨链数据串扰。
+  - 增加缓存 TTL 校验与后台失效定时器机制。
+- [ ] **M7-3 导航栏网络切换组件（NetworkSelector）**：
+  - 顶栏新增网络下拉菜单，展示网络名称与测试网/主网标识。
+  - 切换时自动重新拉取对应网络资源。
+- [ ] **M7-4 国际化与单测覆盖**：
+  - 补齐 zh-CN / en / th 网络选择文案，全套单元测试验证。
 
 ---
 

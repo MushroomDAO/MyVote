@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale, type AppLocale } from './i18n'
+import { currentNetworkId, setNetwork, NETWORK_OPTIONS, type NetworkId } from './lib/networks'
 import { useAuth } from './auth/useAuth'
 import { errorKey } from './lib/errors'
 import { resolvedBranding as branding, tenant } from './tenant'
@@ -69,6 +70,11 @@ onMounted(() => {
   void restoreSession()
 })
 
+const selectedNetwork = computed({
+  get: () => currentNetworkId.value,
+  set: (value: NetworkId) => setNetwork(value)
+})
+
 const selectedLocale = computed({
   get: () => locale.value as AppLocale,
   set: (value: AppLocale) => setLocale(value)
@@ -116,6 +122,13 @@ async function onConnectClick() {
           <option v-if="!walletDisabled" value="wallet">Wallet</option>
           <option value="airaccount">AirAccount</option>
           <option value="email">{{ t('emailLogin') }}</option>
+        </select>
+
+        <label class="label" for="network">{{ t('network') }}</label>
+        <select id="network" v-model="selectedNetwork" class="select networkSelect">
+          <option v-for="net in NETWORK_OPTIONS" :key="net.id" :value="net.id">
+            {{ net.name }} {{ net.isTestnet ? `(${t('testnet')})` : '' }}
+          </option>
         </select>
 
         <label class="label" for="lang">{{ t('language') }}</label>

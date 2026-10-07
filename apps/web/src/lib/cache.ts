@@ -34,7 +34,8 @@ export function cacheDelete(key: string): void {
  * same bundle. A bare key would let one tenant's data be read back under another
  * if a client ever changes tenant without a full reload — namespace it.
  */
-export function scopedCacheKey(namespace: string, scope?: string): string {
+export function scopedCacheKey(namespace: string, scope?: string, network?: string): string {
   const value = scope ?? (typeof window !== 'undefined' ? window.location.host : '')
-  return `${namespace}:${value || 'default'}`
+  const netSuffix = network ? `:${network}` : ''
+  return `${namespace}:${value || 'default'}${netSuffix}`
 }

@@ -106,7 +106,8 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     openSxPlaceholder: '打开链上空间：粘贴 Snapshot X 空间地址 (0x…)',
     openSxButton: '打开',
     openSxInvalid: '请输入有效的 Snapshot X 空间地址（0x 开头的 40 位十六进制）',
-    onchainSpaces: '链上空间（Snapshot X）'
+    onchainSpaces: '链上空间（Snapshot X）',
+    testnet: '测试网'
   },
   en: {
     appTitle: 'MyVote',
@@ -211,7 +212,8 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     openSxPlaceholder: 'Open an on-chain space: paste a Snapshot X address (0x…)',
     openSxButton: 'Open',
     openSxInvalid: 'Enter a valid Snapshot X space address (0x + 40 hex characters)',
-    onchainSpaces: 'On-chain spaces (Snapshot X)'
+    onchainSpaces: 'On-chain spaces (Snapshot X)',
+    testnet: 'Testnet'
   },
   th: {
     appTitle: 'MyVote',
@@ -313,7 +315,8 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     openSxPlaceholder: 'เปิดพื้นที่บนเชน: วางที่อยู่ Snapshot X (0x…)',
     openSxButton: 'เปิด',
     openSxInvalid: 'กรุณาระบุที่อยู่ Snapshot X ที่ถูกต้อง (0x ตามด้วยเลขฐานสิบหก 40 หลัก)',
-    onchainSpaces: 'พื้นที่บนเชน (Snapshot X)'
+    onchainSpaces: 'พื้นที่บนเชน (Snapshot X)',
+    testnet: 'เครือข่ายทดสอบ'
   }
 }
 

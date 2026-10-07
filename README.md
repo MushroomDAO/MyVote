@@ -25,6 +25,44 @@ A white-label governance portal for any community. **Classic Snapshot (off-chain
 
 ---
 
+## User Lifecycle / 用户全生命周期
+
+```mermaid
+flowchart TD
+    Start(["用户进入 MyVote"]) --> SelectNet["1. 选择网络环境 (Sepolia 测试网 / Mainnet 主网)"]
+    SelectNet --> Auth{"2. 选择登录方式"}
+
+    Auth -->|"Web3 钱包"| W1["MetaMask / Rabby 钱包连接"]
+    Auth -->|"免助记词 SSO"| W2["AirAccount / cos72 登录"]
+    Auth -->|"轻量身份"| W3["邮箱验证码登录"]
+
+    W1 --> Explore["3. 浏览社区空间与提案列表 (支持按链与状态筛选)"]
+    W2 --> Explore
+    W3 --> Explore
+
+    Explore --> SpaceType{"4. 识别空间治理协议"}
+
+    SpaceType -->|"经典空间 (ENS 域名标识)"| PathClassic["路径 A: 经典免 Gas 投票"]
+    SpaceType -->|"链上空间 (0x 合约地址)"| PathSX["路径 B: Snapshot X 链上投票"]
+
+    PathClassic --> SignEIP["EIP-712 链下签名 (0 Gas 费，纯签名)"]
+    SignEIP --> HubIPFS["提交 Snapshot Hub 并固化存储至 IPFS"]
+    HubIPFS --> DoneClassic(["投票完成，即时计票生效"])
+
+    PathSX --> SignSX["链上协议签名 (通过 Relayer 代付或自付 Gas)"]
+    SignSX --> ChainTX["上链智能合约记账与自动执行"]
+    ChainTX --> DoneSX(["链上确权完成，结果可直接触发金库执行"])
+
+    subgraph AdminTrack ["社区管理员路径 (扩展)"]
+        AdminRole["发起人建立治理社区"] --> ChoiceAdmin{"模式选择"}
+        ChoiceAdmin -->|"经典治理"| RegENS["持有 ENS 域名并创建 Space"]
+        ChoiceAdmin -->|"全链上治理"| DepContract["部署 Snapshot X 治理合约"]
+        ChoiceAdmin -->|"独立白标门户"| WhiteLabel["在 MyVote 注册独立子域名 (原子认领生效)"]
+    end
+```
+
+---
+
 ## Status
 
 | Milestone | State |

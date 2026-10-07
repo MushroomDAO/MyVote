@@ -43,6 +43,8 @@ const i18n = createI18n({
       emailPlaceholder: 'EMAIL_PH',
       login: 'LOGIN',
       logout: 'LOGOUT',
+      network: 'Network',
+      testnet: 'Testnet',
       errAccountMismatch: 'ERR_ACCOUNT'
     }
   }
@@ -159,6 +161,12 @@ describe('App shell auth controls', () => {
     const wrapper = mountApp()
     await wrapper.get('#lang').setValue('th')
     expect(h.setLocale).toHaveBeenCalledWith('th')
+  })
+
+  it('switches the network through the network select', async () => {
+    const wrapper = mountApp()
+    await wrapper.get('#network').setValue('mainnet')
+    expect((wrapper.get('#network').element as HTMLSelectElement).value).toBe('mainnet')
   })
 
   it('toggles theme between light and dark', async () => {
