@@ -11,6 +11,7 @@ import {
   getFallbackGraphqlEndpoint,
   getFallbackSxApiEndpoint
 } from '../lib/networks'
+import { downloadCommunityExport, exportCommunity, isCommunityExportComplete, type ExportProgress } from '../lib/communityExport'
 import { takePage } from '../lib/pageCursor'
 import { createRequestGuard } from '../lib/requestGuard'
 import { fetchSxProposals, fetchSxSpace, type SxProposal } from '../lib/sx/api'
@@ -24,6 +25,52 @@ const route = useRoute()
 const PAGE_SIZE = 20
 
 const guard = createRequestGuard()
+const exportGuard = createRequestGuard()
+const resolvedEndpoint = ref<string | null>(null)
+const exporting = ref(false)
+const exportProgress = ref<ExportProgress>({ proposals: 0, votes: 0, requests: 0 })
+const exportStatus = ref('')
+const exportError = ref(false)
+
+function cancelExport() {
+  exportGuard.abort()
+  exporting.value = false
+  exportStatus.value = 'exportCancelled'
+  exportError.value = false
+}
+
+function resetExport() {
+  cancelExport()
+  exportStatus.value = ''
+}
+
+async function downloadExport() {
+  if (exporting.value || !resolvedEndpoint.value) return
+  const token = exportGuard.next()
+  exporting.value = true
+  exportError.value = false
+  exportStatus.value = ''
+  exportProgress.value = { proposals: 0, votes: 0, requests: 0 }
+  try {
+    const data = await exportCommunity({
+      spaceId: spaceId.value,
+      endpoint: resolvedEndpoint.value,
+      signal: exportGuard.signal,
+      onProgress: (progress) => {
+        if (exportGuard.isCurrent(token)) exportProgress.value = progress
+      }
+    })
+    if (!exportGuard.isCurrent(token)) return
+    downloadCommunityExport(data)
+    exportStatus.value = isCommunityExportComplete(data) ? 'exportDownloaded' : 'exportPartial'
+  } catch {
+    if (!exportGuard.isCurrent(token)) return
+    exportError.value = true
+    exportStatus.value = 'exportFailed'
+  } finally {
+    if (exportGuard.isCurrent(token)) exporting.value = false
+  }
+}
 
 const spaceId = computed(() => String(route.params.id ?? ''))
 
@@ -79,6 +126,7 @@ async function loadSpace(skip: number, keepSpace = false) {
       space.value = null
       proposals.value = []
       sxMeta.value = null
+      resolvedEndpoint.value = null
     }
   } else {
     loadingMore.value = true
@@ -104,7 +152,7 @@ function getSxEndpoint(): string {
   try {
     if (sx) {
       // On-chain space: read from the SX indexer instead of the off-chain Hub.
-      let sxEndpoint = getSxEndpoint()
+      let sxEndpoint = resolvedEndpoint.value ?? getSxEndpoint()
       let [sxSpace, page] = await Promise.all([
         fetchSxSpace(sxEndpoint, spaceId.value, { signal }),
         fetchSxProposals(sxEndpoint, spaceId.value, { first: PAGE_SIZE + 1, skip, signal, state })
@@ -121,12 +169,15 @@ function getSxEndpoint(): string {
           if (fbSpace) {
             sxSpace = fbSpace
             page = fbPage
+            sxEndpoint = fallback
           }
         } catch {
           // ignore fallback failure
         }
       }
 
+      if (!guard.isCurrent(token)) return
+      resolvedEndpoint.value = sxSpace ? sxEndpoint : null
       space.value = sxSpace
         ? { id: sxSpace.id, name: sxSpace.name ?? sxSpace.id, about: sxSpace.about ?? undefined }
         : { id: spaceId.value, name: spaceId.value }
@@ -139,7 +190,7 @@ function getSxEndpoint(): string {
       return
     }
 
-    let endpoint = getGraphqlEndpoint()
+    let endpoint = resolvedEndpoint.value ?? getGraphqlEndpoint()
     let data = await fetchSpaceWithProposals(endpoint, {
       spaceId: spaceId.value,
       first: PAGE_SIZE + 1,
@@ -162,12 +213,15 @@ function getSxEndpoint(): string {
         })
         if (fallbackData.space) {
           data = fallbackData
+          endpoint = fallbackEndpoint
         }
       } catch {
         // Fallback failed
       }
     }
 
+    if (!guard.isCurrent(token)) return
+    if (data.space) resolvedEndpoint.value = endpoint
     const { page, hasMore: more } = takePage(data.proposals, PAGE_SIZE)
     if (skip === 0) {
       space.value = data.space ?? {
@@ -218,6 +272,8 @@ function proposalLink(p: ProposalListItem) {
 }
 
 watch(spaceId, () => {
+  resetExport()
+  resolvedEndpoint.value = null
   // Resetting the filter already reloads via the stateFilter watcher; calling
   // here as well would fire the same request twice.
   if (stateFilter.value !== 'all') {
@@ -233,6 +289,7 @@ watch(stateFilter, () => {
 })
 
 watch(currentNetworkId, () => {
+  resetExport()
   void loadSpace(0)
 })
 
@@ -242,6 +299,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   guard.abort()
+  exportGuard.abort()
 })
 </script>
 
@@ -291,6 +349,24 @@ onUnmounted(() => {
       <div v-else-if="formatSpaceNetwork(space.network)" class="sxMeta">
         {{ t('network') }}: {{ formatSpaceNetwork(space.network) }}
       </div>
+
+      <section class="export" :aria-label="t('exportCommunity')">
+        <div class="exportActions">
+          <button class="exportBtn" type="button" :aria-busy="exporting" :disabled="exporting || !resolvedEndpoint"
+            aria-describedby="exportHint" @click="downloadExport">
+            {{ exporting ? t('exportPreparing') : t('exportCommunity') }}
+          </button>
+          <button v-if="exporting" class="retryBtn" type="button" @click="cancelExport">
+            {{ t('exportCancel') }}
+          </button>
+        </div>
+        <p id="exportHint" class="muted">{{ t('exportHint') }}</p>
+        <p v-if="!resolvedEndpoint" class="muted">{{ t('exportUnavailable') }}</p>
+        <p role="status" aria-live="polite" class="muted">
+          {{ exporting ? t('exportProgress', exportProgress) : !exportError && exportStatus ? t(exportStatus) : '' }}
+        </p>
+        <p v-if="exportError" role="alert" class="error">{{ t(exportStatus) }}</p>
+      </section>
 
       <div class="sectionTitle">{{ t('proposals') }}</div>
       <div class="filters">
@@ -468,6 +544,39 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 12px;
   padding: 12px 0;
+}
+
+.export {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--mv-border);
+}
+
+.exportActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.exportBtn {
+  border: 1px solid var(--mv-primary);
+  border-radius: var(--mv-radius-full);
+  padding: 8px 18px;
+  background: var(--mv-surface);
+  color: var(--mv-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.exportBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.exportBtn:focus-visible,
+.export .retryBtn:focus-visible {
+  outline: 2px solid var(--mv-primary);
+  outline-offset: 3px;
 }
 
 .filters {

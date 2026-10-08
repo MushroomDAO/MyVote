@@ -1,16 +1,20 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import { nextTick } from 'vue'
+import { currentNetworkId } from '../lib/networks'
+import { messages } from '../i18n'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // Previously-mounted wrappers stay reactive to the shared route mock, so an
 // earlier test's component would react to this test's navigation too.
 enableAutoUnmount(afterEach)
 
-const { fetchSpaceWithProposals, fetchSxSpace, fetchSxProposals } = vi.hoisted(() => ({
+const { fetchSpaceWithProposals, fetchSxSpace, fetchSxProposals, exportCommunity, downloadCommunityExport } = vi.hoisted(() => ({
   fetchSpaceWithProposals: vi.fn(),
   fetchSxSpace: vi.fn(),
-  fetchSxProposals: vi.fn()
+  fetchSxProposals: vi.fn(),
+  exportCommunity: vi.fn(),
+  downloadCommunityExport: vi.fn()
 }))
 
 vi.mock('../lib/graphql', async (importOriginal) => {
@@ -21,7 +25,14 @@ vi.mock('../lib/graphql', async (importOriginal) => {
   }
 })
 
-vi.mock('../lib/sx/api', () => ({
+vi.mock('../lib/communityExport', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../lib/communityExport')>(),
+  exportCommunity,
+  downloadCommunityExport
+}))
+
+vi.mock('../lib/sx/api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../lib/sx/api')>(),
   fetchSxSpace: (...args: unknown[]) => fetchSxSpace(...args),
   fetchSxProposals: (...args: unknown[]) => fetchSxProposals(...args)
 }))
@@ -45,6 +56,7 @@ const i18n = createI18n({
   locale: 'en',
   messages: {
     en: {
+      ...messages.en,
       back: 'Back',
       loading: 'Loading…',
       empty: 'No data',
@@ -397,5 +409,150 @@ describe('SpacePage error recovery', () => {
 
     expect(fetchSpaceWithProposals).toHaveBeenCalledTimes(2)
     expect(wrapper.text()).toContain('Space A')
+  })
+})
+
+
+describe('SpacePage community export', () => {
+  const complete = { history: { proposals: { status: 'complete' }, records: [] } }
+  async function showSpace() {
+    route.params.id = 'space-a'
+    fetchSpaceWithProposals.mockResolvedValue(spaceResult('space-a', 'A'))
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+    return wrapper
+  }
+
+  it('exports all history from the resolved endpoint independently of filters and preserves the list', async () => {
+    const wrapper = await showSpace()
+    await wrapper.findAll('.filterBtn')[1]!.trigger('click')
+    await flushPromises()
+    exportCommunity.mockResolvedValue(complete)
+    await wrapper.get('.exportBtn').trigger('click')
+    await flushPromises()
+    expect(exportCommunity).toHaveBeenCalledTimes(1)
+    const options = exportCommunity.mock.calls[0]![0]
+    expect(options.spaceId).toBe('space-a')
+    expect(options.endpoint).toBe(fetchSpaceWithProposals.mock.lastCall![0])
+    expect(options.state).toBeUndefined()
+    expect(options.signal).toBeInstanceOf(AbortSignal)
+    expect(downloadCommunityExport).toHaveBeenCalledWith(complete)
+    expect(wrapper.get('[role="status"]').text()).toContain('JSON downloaded')
+    expect(wrapper.findAll('.filterBtn')[1]!.classes()).toContain('isActive')
+  })
+
+  it('disables duplicate export, announces progress, and cancels without downloading late results', async () => {
+    const wrapper = await showSpace()
+    const pending = deferred()
+    exportCommunity.mockReturnValue(pending.promise)
+    await wrapper.get('.exportBtn').trigger('click')
+    await wrapper.get('.exportBtn').trigger('click')
+    expect(exportCommunity).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('.exportBtn').attributes('disabled')).toBeDefined()
+    const options = exportCommunity.mock.calls[0]![0]
+    options.onProgress({ proposals: 12, votes: 34, requests: 5 })
+    await nextTick()
+    expect(wrapper.get('[role="status"]').text()).toContain('12 proposals and 34 vote records')
+    await wrapper.get('.export .retryBtn').trigger('click')
+    expect(options.signal.aborted).toBe(true)
+    expect(wrapper.get('[role="status"]').text()).toContain('cancelled')
+    pending.resolve(complete)
+    await flushPromises()
+    expect(downloadCommunityExport).not.toHaveBeenCalled()
+  })
+
+  it('cancels stale exports on route changes and unmount', async () => {
+    const wrapper = await showSpace()
+    const pending = deferred()
+    exportCommunity.mockReturnValue(pending.promise)
+    await wrapper.get('.exportBtn').trigger('click')
+    const first = exportCommunity.mock.lastCall![0].signal
+    route.params.id = 'space-b'
+    fetchSpaceWithProposals.mockResolvedValue(spaceResult('space-b', 'B'))
+    await nextTick()
+    await flushPromises()
+    expect(first.aborted).toBe(true)
+    pending.resolve(complete)
+    await flushPromises()
+    expect(downloadCommunityExport).not.toHaveBeenCalled()
+    exportCommunity.mockReturnValue(deferred().promise)
+    await wrapper.get('.exportBtn').trigger('click')
+    const second = exportCommunity.mock.lastCall![0].signal
+    wrapper.unmount()
+    expect(second.aborted).toBe(true)
+  })
+
+  it('cancels when the selected network changes', async () => {
+    const wrapper = await showSpace()
+    const initialNetwork = currentNetworkId.value
+    const pending = deferred()
+    exportCommunity.mockReturnValue(pending.promise)
+    await wrapper.get('.exportBtn').trigger('click')
+    const options = exportCommunity.mock.lastCall![0]
+    currentNetworkId.value = initialNetwork === 'optimism' ? 'mainnet' : 'optimism'
+    await nextTick()
+    expect(options.signal.aborted).toBe(true)
+    pending.resolve(complete)
+    await flushPromises()
+    expect(downloadCommunityExport).not.toHaveBeenCalled()
+    wrapper.unmount()
+    currentNetworkId.value = initialNetwork
+  })
+
+  it('announces partial exports and offers retry on failure without hiding community content', async () => {
+    const wrapper = await showSpace()
+    const partial = { history: { proposals: { status: 'partial' }, records: [] } }
+    exportCommunity.mockResolvedValueOnce(partial).mockRejectedValueOnce(new Error('HTTP 500'))
+    await wrapper.get('.exportBtn').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[role="status"]').text()).toContain('incomplete history')
+    await wrapper.get('.exportBtn').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[role="alert"]').text()).toBe('Export failed. Please retry.')
+    expect(wrapper.get('h1').text()).toBe('A')
+    expect(wrapper.get('.exportBtn').attributes('disabled')).toBeUndefined()
+  })
+
+  it('uses the classic fallback endpoint for export and subsequent proposal pages', async () => {
+    route.params.id = 'fallback.eth'
+    fetchSpaceWithProposals.mockResolvedValueOnce({ space: null, proposals: [] })
+      .mockResolvedValue({ space: { id: 'fallback.eth', name: 'Fallback' }, proposals: [] })
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+    const endpoint = fetchSpaceWithProposals.mock.lastCall![0]
+    expect(endpoint).not.toBe(fetchSpaceWithProposals.mock.calls[0]![0])
+    exportCommunity.mockResolvedValue(complete)
+    await wrapper.get('.exportBtn').trigger('click')
+    await flushPromises()
+    expect(exportCommunity.mock.lastCall![0].endpoint).toBe(endpoint)
+    await wrapper.findAll('.filterBtn')[1]!.trigger('click')
+    await flushPromises()
+    expect(fetchSpaceWithProposals.mock.lastCall![0]).toBe(endpoint)
+  })
+
+  it('uses the SX fallback endpoint and keeps export protocol routing independent of the list', async () => {
+    const SX = '0x1111111111111111111111111111111111111111'
+    route.params.id = SX
+    fetchSxSpace.mockResolvedValueOnce(null).mockResolvedValue(sxSpace(SX, 'SX'))
+    fetchSxProposals.mockResolvedValue([])
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+    const endpoint = fetchSxSpace.mock.lastCall![0]
+    expect(endpoint).not.toBe(fetchSxSpace.mock.calls[0]![0])
+    exportCommunity.mockResolvedValue(complete)
+    await wrapper.get('.exportBtn').trigger('click')
+    await flushPromises()
+    expect(exportCommunity.mock.lastCall![0]).toMatchObject({ spaceId: SX, endpoint })
+  })
+
+  it('does not export synthetic detail-page metadata when both Hubs lack the space', async () => {
+    route.params.id = 'aastar.eth'
+    fetchSpaceWithProposals.mockResolvedValue({ space: null, proposals: [] })
+    const wrapper = mount(SpacePage, { global: { plugins: [i18n] } })
+    await flushPromises()
+    expect(wrapper.get('.exportBtn').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('unavailable from the upstream API')
+    await wrapper.get('.exportBtn').trigger('click')
+    expect(exportCommunity).not.toHaveBeenCalled()
   })
 })
