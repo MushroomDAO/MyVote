@@ -171,6 +171,15 @@ apps/web/scripts/deploy-preview.sh dev        # preview (uses the preview KV nam
 
 Vue 3 + TypeScript + Vite, no state-management library. All backend access is external (Snapshot Hub GraphQL, the Snapshot X indexer, and Cloudflare Pages Functions). See [`CLAUDE.md`](./CLAUDE.md) for the layer map, data flow and key decisions.
 
+### Community export API verification
+
+Read-only live GraphQL checks on **2026-10-09** confirmed the export queries work against both official APIs for the tested spaces:
+
+- Classic Snapshot Hub [`hub.snapshot.org/graphql`](https://hub.snapshot.org/graphql): `bonustrack.eth` returned 2 proposals and 52 votes total (52 + 0); 4 requests including space metadata.
+- Snapshot X [`api.snapshot.box`](https://api.snapshot.box): Optimism space `0x03C7431e14F7b759Aa44398AD7901e6053c197Bf` resolved to indexer `oeth` and returned 12 proposals and 36 votes total (3 per proposal); 14 requests including space metadata.
+
+These checks confirm the endpoints and queried fields for these examples, not universal availability or archival completeness. Exports reflect current indexed API data; deleted records and prior versions of replaced votes may not be available. See the [Hub API docs](https://docs.snapshot.box/tools/api) and [Snapshot X API docs](https://docs.snapshot.box/snapshot-x/services/api).
+
 Handy entry points:
 
 - `src/lib/snapshotVote.ts` — hand-rolled off-chain EIP-712 vote envelope (no `snapshot.js`, no ethers).
