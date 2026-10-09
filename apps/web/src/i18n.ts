@@ -7,6 +7,17 @@ export type AppLocale = 'zh-CN' | 'en' | 'th'
 /** Exported so the i18n coverage test can assert all catalogs are complete. */
 export const messages: Record<AppLocale, Record<string, string>> = {
   'zh-CN': {
+    exportCommunity: "导出社区 JSON",
+    exportPreparing: "正在准备导出…",
+    exportCancel: "取消导出",
+    exportHint: "下载社区资料及所有状态的提案和投票记录，不受当前列表筛选影响。缺失字段及未完整导出的历史会在 JSON 中注明；大型社区可能需要几分钟。",
+    exportProgress: "已读取 {proposals} 个提案、{votes} 条投票记录（{requests} 次请求）。",
+    exportDownloaded: "JSON 已下载。已导出 API 可见的提案和投票记录。",
+    exportPartial: "JSON 已下载，但历史记录未完整导出。请查看文件中的范围说明和限制。",
+    exportFailed: "导出失败，请重试。",
+    exportCancelled: "导出已取消。",
+    exportUnavailable: "上游 API 未提供社区资料，暂时无法导出。",
+
     appTitle: 'MyVote',
     explore: '探索',
     language: '语言',
@@ -115,6 +126,17 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     pinned: '置顶'
   },
   en: {
+    exportCommunity: "Export community JSON",
+    exportPreparing: "Preparing export…",
+    exportCancel: "Cancel export",
+    exportHint: "Download community details and proposals and votes in all states, regardless of the list filter. Missing fields and incomplete history are labeled in the JSON; large communities may take several minutes.",
+    exportProgress: "Read {proposals} proposals and {votes} vote records ({requests} requests).",
+    exportDownloaded: "JSON downloaded with API-visible proposals and vote records.",
+    exportPartial: "JSON downloaded with incomplete history. Review the scope and limits in the file.",
+    exportFailed: "Export failed. Please retry.",
+    exportCancelled: "Export cancelled.",
+    exportUnavailable: "Community metadata is unavailable from the upstream API, so export is unavailable.",
+
     appTitle: 'MyVote',
     explore: 'Explore',
     language: 'Language',
@@ -226,6 +248,17 @@ export const messages: Record<AppLocale, Record<string, string>> = {
     pinned: 'Pinned'
   },
   th: {
+    exportCommunity: "ส่งออกชุมชนเป็น JSON",
+    exportPreparing: "กำลังเตรียมส่งออก…",
+    exportCancel: "ยกเลิกการส่งออก",
+    exportHint: "ดาวน์โหลดข้อมูลชุมชน ข้อเสนอและคะแนนเสียงทุกสถานะ โดยไม่ขึ้นกับตัวกรองรายการ ฟิลด์ที่ขาดและประวัติที่ไม่ครบจะระบุใน JSON ชุมชนขนาดใหญ่อาจใช้เวลาหลายนาที",
+    exportProgress: "อ่านแล้ว {proposals} ข้อเสนอ และ {votes} รายการคะแนนเสียง ({requests} คำขอ)",
+    exportDownloaded: "ดาวน์โหลด JSON พร้อมข้อเสนอและคะแนนเสียงที่ API แสดงแล้ว",
+    exportPartial: "ดาวน์โหลด JSON แล้ว แต่ประวัติไม่ครบ โปรดตรวจสอบขอบเขตและข้อจำกัดในไฟล์",
+    exportFailed: "ส่งออกไม่สำเร็จ โปรดลองอีกครั้ง",
+    exportCancelled: "ยกเลิกการส่งออกแล้ว",
+    exportUnavailable: "API ต้นทางไม่มีข้อมูลชุมชน จึงไม่สามารถส่งออกได้",
+
     appTitle: 'MyVote',
     explore: 'สำรวจ',
     language: 'ภาษา',

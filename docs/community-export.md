@@ -1,0 +1,26 @@
+# Community JSON export
+
+The community detail page offers **Export community JSON** without requiring login. The export fetches metadata and history independently of the visible proposal page and state filter. It uses the endpoint that actually supplied the community, including mainnet/testnet fallback. Navigation, a network change, unmounting, or **Cancel export** aborts the export and prevents a stale download.
+
+JSON schema version 1 includes an ISO export timestamp, the read endpoint, protocol, network/indexer context, upstream metadata, management roles, reported contract configuration, proposals and their vote records. Wire values are preserved, including Snapshot X big-number strings, null metadata and classic structured choices. Unavailable fields have `value: null`, `availability: unavailable` and a reason. A reported empty role list remains `[]`. Classic spaces have no governance-space contract (`not_applicable`); strategy parameters and treasury addresses are reported configuration, not proof that those addresses are contracts. No ENS owner, execution address, admin role or missing metadata is fabricated.
+
+Classic Snapshot is the default backend; Snapshot X is optional. Export queries are separate from the existing detail-page queries:
+
+- Classic Hub: basic space fields, admins, moderators, members, strategies and treasuries; full proposal contents/results and votes with voter, choice, voting power, timestamp, reason, metadata and IPFS identifiers. The Hub space API does not expose a controller or a canonical execution contract.
+- Snapshot X: metadata, controller, authenticators, validation/voting strategies and parameters; proposals with metadata, raw scores, execution strategy and treasuries; votes with nested `voter { id }`, raw/scaled voting power and transaction hash. The API does not expose classic admin/moderator lists. Proposal and vote reads are scoped to the space's returned indexer. Per-choice results expose only three score fields.
+
+## History scope and bounds
+
+The exporter requests all states and enumerates the API-visible records created through the export start time. This is a live indexer export, not an atomic blockchain snapshot or a signed archive. Deleted records, historical versions of replaced votes, and data absent from the upstream API cannot be recovered here. Private/encrypted choices and null fields remain as returned. Counts may change while exporting; mismatches are labeled.
+
+Pages request 1,000 records in ascending creation order. After a full page, pagination restarts at the final timestamp with an offset for rows already consumed at that timestamp. This avoids deep offsets without skipping timestamp ties. It stops at a tie offset above 5,000 instead of issuing a Hub request outside its documented source-code bound. Short pages terminate enumeration; repeated/unordered/malformed pages and count mismatches are explicitly incomplete.
+
+Each export is bounded to 300 requests and 100,000 history records total, with at least 650 ms between request starts and a 20-second timeout per request. Limits are included in the JSON. Metadata failure stops the download; a history failure preserves retrieved records with `partial` or `unavailable` scope. If a vote query fails, it is not repeatedly retried for every remaining proposal: those vote scopes are explicitly unavailable. No automatic retry loop is used. Proposal scope and every proposal's vote scope have a status, exported count, upstream expected count when supplied, and machine-readable reasons. The UI announces an incomplete-history download whenever any scope is incomplete.
+
+## Evidence and validation
+
+Fields and limits were checked against the [official Hub API documentation](https://docs.snapshot.box/tools/api), upstream [Hub schema](https://github.com/snapshot-labs/sx-monorepo/blob/master/apps/hub/src/graphql/schema.gql), [Hub limit checks](https://github.com/snapshot-labs/sx-monorepo/blob/master/apps/hub/src/graphql/helpers.ts), [Snapshot X schema](https://github.com/snapshot-labs/sx-monorepo/blob/master/apps/api/src/schema.gql), and [official UI queries](https://github.com/snapshot-labs/sx-monorepo/blob/master/apps/ui/src/networks/common/graphqlApi/queries.ts). Live read-only checks on 2026-10-08 accepted the export queries on `hub.snapshot.org/graphql` (`yam.eth`) and `api.snapshot.box` (Optimism space `0x03C7431e14F7b759Aa44398AD7901e6053c197Bf`). Full read-only exporter smoke checks also completed with matching counts: classic `bonustrack.eth` exported 2 proposals and 52 votes in 4 requests; the Optimism Snapshot X space exported 12 proposals and 36 votes in 14 requests. These checks validate the available read shapes, not a protocol-wide audit or permanent API guarantee.
+
+The controls and announcements ship in zh-CN, en and th (Thai is present in both the message catalog and language selector). Native buttons, focus indicators, a live progress/status region and alert messages provide keyboard and assistive-technology access.
+
+Run validation from the repository root with `pnpm -C apps/web typecheck`, `pnpm -C apps/web test` and `pnpm -C apps/web build`; the root has no package manifest. Unit tests cover both wire shapes, multi-page history/ties, bounds, error/partial scope, download cleanup, cancellation, fallback provenance and unchanged proposal filters/paging.

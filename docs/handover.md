@@ -9,15 +9,15 @@
 
 ## 一、 项目背景与架构概览
 
-MyVote 是基于官方 Snapshot 与 Snapshot X 深度定制、二次开发并合并的开源去中心化治理客户端。
+MyVote 是独立的开源治理客户端：默认使用经典链下 Snapshot Hub，Snapshot X 是可选链上后端；前端共用界面和路由，不代表两个协议被合并。依据：[README](../README.md)、[技术选型决策](./snapshot-version-decision.md)、[Snapshot X 集成说明](./snapshot-x-integration.md)。
 
 ### 1. 双治理引擎自动路由
-- **Snapshot (链下模式)**: 直连官方 Snapshot Hub (`hub.snapshot.org` / `testnet.hub.snapshot.org`)，选票与提案记录在 IPFS 上（由 Snapshot 官方基金会付费 Pinning），用户免 Gas 签名投票。
-- **Snapshot X (链上模式)**: 直连已审计的纯链上合约 (`api.snapshot.box` / `testnet-api.snapshot.box`)，通过智能合约实现去中心化提案与执行（经 ABDK、Nethermind 等安全审计）。
+- **Snapshot (链下模式)**: 直连官方 Snapshot Hub (`hub.snapshot.org` / `testnet.hub.snapshot.org`)，读取上游索引的提案与投票记录；经典协议采用签名和 IPFS 数据，不应据此承诺永久存储或推断 Pinning 付费方，用户免 Gas 签名投票。
+- **Snapshot X (可选链上模式)**: 从 GraphQL 索引器 (`api.snapshot.box` / `testnet-api.snapshot.box`) 读取链上空间，投票写入协议合约。这些 API 地址不是合约地址；执行能力取决于空间配置，本客户端没有实现提案创建或执行管理 UI。审计结论必须针对具体上游合约版本与审计报告核验，不能作为整个 MyVote 或合并引擎的安全背书。参见[官方概览](https://docs.snapshot.box/snapshot-x/overview)。
 
 ### 2. 核心架构与多租户
 - **多租户 (Multi-tenant) / 独立空间模式**: 支持根域名访问 Explore 多组织浏览，或通过子域/环境变量绑定专属单个 Space（例如 `aastar.eth`）。
-- **多语言适配**: 深度支持中文 (`zh-CN`, 默认)、英文 (`en`)、泰文 (`th`) 三语。
+- **多语言适配**: 已实际发布中文 (`zh-CN`, 默认)、英文 (`en`, 回退)、泰文 (`th`) 三套消息与语言选择器（`src/i18n.ts` / `src/App.vue`）。
 
 ---
 
@@ -32,7 +32,7 @@ MyVote 是基于官方 Snapshot 与 Snapshot X 深度定制、二次开发并合
 5. **文档规约**: 除了根目录 `README.md` 外，所有新建与修改的 Markdown 文档必须存放在 `docs/` 目录下。禁止未经用户允许主动新建随意文档。
 6. **质量门禁**: 任何改动推送到远程前，必须确保本地类型检查与单元测试全部通过：
    ```bash
-   pnpm --filter web typecheck && pnpm --filter web test
+   pnpm -C apps/web typecheck && pnpm -C apps/web test
    ```
 
 ---
@@ -41,17 +41,19 @@ MyVote 是基于官方 Snapshot 与 Snapshot X 深度定制、二次开发并合
 
 ### 1. 本地启动
 ```bash
-pnpm install
-pnpm --filter web dev
+pnpm -C apps/web install
+pnpm -C apps/web dev
 ```
+
+> 仓库根目录没有 `package.json`，命令必须以 `apps/web` 为包目录。
 
 ### 2. 验证与测试
 ```bash
 # 类型检查
-pnpm --filter web typecheck
+pnpm -C apps/web typecheck
 
 # 单元测试 (Vitest)
-pnpm --filter web test
+pnpm -C apps/web test
 ```
 
 ### 3. 构建与部署预览环境
@@ -68,8 +70,8 @@ apps/web/scripts/deploy-preview.sh dev
 1. **多网络过滤与双 Hub 容错回退**:
    - 解决了 Explore 页面多链切换（Arbitrum、Base、Optimism、Sepolia 等）过滤失效问题。
    - 增加了主网与测试网 Hub 之间的自动 Fallback 兜底机制，保证测试网 Space 即使在主 Hub 缺失时也能从测试 Hub 加载成功。
-2. **默认语言与三语自适应**:
-   - 默认语言设置为中文 (`zh-CN`)，Explore 页标题副标突出双引擎（Snapshot IPFS 免 Gas + Snapshot X 纯链上已审计）的技术信任背书。
+2. **默认语言与三套语言消息**:
+   - 默认语言设置为中文 (`zh-CN`)。当前 Explore 副标包含 Snapshot/IPFS、Snapshot X 与泛化审计宣传文案；准确协议定位仍应以 README 首段和技术选型文档的「经典默认、SX 可选」为准，宣传文案不能作为安全证据。
 3. **样式与视觉细节修复**:
    - 修复了标题文字渐变在容器宽度变化时被裁切成单色的问题（通过 `display: inline-block` 收紧渐变范围）。
 4. **邮箱白屏 Bug 根因修复**:
@@ -81,7 +83,7 @@ apps/web/scripts/deploy-preview.sh dev
    - 在 Explore 页面将演示社区 `aastar.eth` 固定锁定在列表首位，附带高亮与「置顶」徽章。
    - [SpacePage.vue](file:///Users/jason/Dev/mycelium/MyVote/apps/web/src/pages/SpacePage.vue) 增加了对该演示社区元数据的优雅降级回退，保证详情页始终可用。
 7. **技术底座信任文档**:
-   - 在 `README.md` 中补充了《Trust & Technical Foundations / 信任与技术底座》，详细解答了 IPFS Pinning 费用机制及 Snapshot X 合约安全性。
+   - 在 `README.md` 中补充了《Trust & Technical Foundations / 信任与技术底座》，包含 IPFS 与合约安全说明；其中存储保证、费用承担与泛化审计陈述应以具体官方文档/报告为准，交接文档不应复述为已核验事实。
 
 ---
 
